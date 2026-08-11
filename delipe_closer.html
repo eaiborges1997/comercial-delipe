@@ -1230,37 +1230,48 @@ function recalc(){
       var pM=nivelParam==='abaixo'?0:(nivelParam==='ideal'?p.mrrIdeal:p.mrrMin);
       var pP=nivelParam==='abaixo'?0:(nivelParam==='ideal'?p.prodIdeal:p.prodMin);
 
-      // Calcular MRR Serv separando Delipe One (taxa especial) dos demais
-      var mrrServ=0, comServ=0;
-      cLeads.forEach(function(l){
-        mrrServ += l.mrrServ;
-        if(l.servico === 'Delipe One'){
-          // Taxa especial: 2.5% para Evento/Trafego Pago, 5% para outros canais
-          var taxaDelipeOne = (c==='Evento'||c==='Trafego Pago') ? 0.025 : 0.05;
-          comServ += l.mrrServ * taxaDelipeOne;
-        } else {
-          comServ += l.mrrServ * pM;
-        }
-      });
+      // MRR Serv: sempre usa taxa do canal (Delipe One nao tem MRR Serv)
+      var mrrServ = cLeads.reduce(function(s,l){ return s + l.mrrServ; }, 0);
+      var comServ = mrrServ * pM;
 
       var mrrBi=cLeads.reduce(function(s,l){return s+l.mrrBi;},0);
       var qtdBi=cLeads.filter(function(l){return l.mrrBi>0;}).length;
-      var prod=cLeads.reduce(function(s,l){return s+l.impl+l.evento+l.produto;},0);
+
+      // Prod/Impl: Delipe One usa taxa especial (2.5% Evento/TrafegoPago, 5% outros)
+      var prod=0, comProd=0;
+      cLeads.forEach(function(l){
+        var valProd = l.impl + l.evento + l.produto;
+        prod += valProd;
+        if(l.servico === 'Delipe One'){
+          var taxaD1 = (c==='Evento'||c==='Trafego Pago') ? 0.025 : 0.05;
+          comProd += valProd * taxaD1;
+        } else {
+          comProd += valProd * pP;
+        }
+      });
+
       var comBi=c2ativo?(qtdBi*valorBI):(mrrBi*pM);
-      var comProd=prod*pP;
       var tot=comServ+comBi+comProd;
       totC+=tot;
 
-      // Taxa exibida: se todos Delipe One mostra taxa especial; se misturado mostra "misto"
-      var qtdDelipeOne = cLeads.filter(function(l){ return l.servico==='Delipe One'; }).length;
-      var todosDelipeOne = cLeads.length>0 && qtdDelipeOne===cLeads.length;
-      var algumDelipeOne = qtdDelipeOne>0 && qtdDelipeOne<cLeads.length;
-      var taxaEspec = (c==='Evento'||c==='Trafego Pago') ? '2,5%' : '5,0%';
-      var taxaExib = todosDelipeOne
-        ? taxaEspec+' (D1)'
-        : algumDelipeOne
-          ? (pM?(pM*100).toFixed(1)+'%':taxaEspec)+' +D1'
-          : (mrrServ&&pM?(pM*100).toFixed(1)+'%':'--');
+      // Taxa exibida MRR Serv
+      var taxaExib = mrrServ&&pM ? (pM*100).toFixed(1)+'%' : '--';
+
+      // Taxa exibida Prod: efetiva real
+      var taxaProdExib;
+      if(!prod){
+        taxaProdExib = '--';
+      } else {
+        var qtdProdD1 = cLeads.filter(function(l){ return l.servico==='Delipe One' && (l.impl+l.evento+l.produto)>0; }).length;
+        var qtdProdTotal = cLeads.filter(function(l){ return (l.impl+l.evento+l.produto)>0; }).length;
+        if(qtdProdD1===qtdProdTotal && qtdProdD1>0){
+          taxaProdExib = ((c==='Evento'||c==='Trafego Pago')?'2,5%':'5,0%')+' (D1)';
+        } else if(qtdProdD1>0){
+          taxaProdExib = (comProd/prod*100).toFixed(1)+'%* (c/D1)';
+        } else {
+          taxaProdExib = pP?(pP*100).toFixed(1)+'%':'--';
+        }
+      }
 
       var biCell=c2ativo?(qtdBi>0?qtdBi+'x '+fmt(valorBI):'--'):(mrrBi?(pM*100).toFixed(1)+'%':'--');
       return '<tr><td>'+c+'</td>'
@@ -1269,7 +1280,7 @@ function recalc(){
         +'<td>'+(mrrServ?taxaExib:'--')+'</td>'
         +'<td class="'+(c2ativo&&qtdBi>0?'grn':'')+'">'+(mrrBi?biCell:'--')+'</td>'
         +'<td>'+(prod?fmt(prod):'--')+'</td>'
-        +'<td>'+(prod&&pP?(pP*100).toFixed(1)+'%':'--')+'</td>'
+        +'<td>'+(prod?taxaProdExib:'--')+'</td>'
         +'<td class="ora">'+(tot?fmt(tot):'--')+'</td></tr>';
     }).join('');
     return {html:comH+comR+'<tr><td>SUBTOTAL</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="ora">'+fmt(totC)+'</td></tr>', total:totC};
