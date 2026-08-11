@@ -1068,22 +1068,20 @@ function getMetrics(){
   m.totalCombinado=m.totalMrr+m.totalMrrBi+m.totalEvento+m.totalImpl+m.totalProd;
   m.convGeral=m.total>0?m.vendidos/m.total:0;
 
-  // Ticket medio por EMPRESA unica (nao por linha)
-  // Agrupa vendidos por CNPJ limpo ou por nome quando CNPJ nao informado
+  // Ticket medio separado por tipo de servico
+  // MRR Servico: leads vendidos com servico != 'BI' e mrrServ > 0
+  // MRR BI: leads vendidos com servico == 'BI' e mrrBi > 0
   var vends=leads.filter(function(l){return l.status==='Vendido';});
-  var empresasTicket={};
-  vends.forEach(function(l){
-    var cnpjLimpo=l.cnpj?l.cnpj.replace(/\D/g,''):'';
-    var key=cnpjLimpo.length>=14?cnpjLimpo:('__nome__'+(l.empresa||'').toLowerCase().trim());
-    if(!empresasTicket[key]) empresasTicket[key]={mrr:0,mrrbi:0};
-    empresasTicket[key].mrr+=l.mrrServ;
-    empresasTicket[key].mrrbi+=l.mrrBi;
-  });
-  var empKeys=Object.keys(empresasTicket);
-  var qtdEmpresas=empKeys.length;
-  m.ticketMrr=qtdEmpresas>0?empKeys.reduce(function(s,k){return s+empresasTicket[k].mrr;},0)/qtdEmpresas:0;
-  m.ticketMrrBi=qtdEmpresas>0?empKeys.reduce(function(s,k){return s+empresasTicket[k].mrrbi;},0)/qtdEmpresas:0;
-  m.qtdEmpresasVendidas=qtdEmpresas;
+  var vendsServico = vends.filter(function(l){ return l.servico !== 'BI' && l.mrrServ > 0; });
+  var vendsBi      = vends.filter(function(l){ return l.servico === 'BI' && l.mrrBi   > 0; });
+  var qtdMrrServ   = vendsServico.length;
+  var qtdMrrBi     = vendsBi.length;
+  var totalMrrServ = vendsServico.reduce(function(s,l){ return s + l.mrrServ; }, 0);
+  var totalMrrBi   = vendsBi.reduce(function(s,l){      return s + l.mrrBi;   }, 0);
+  m.ticketMrr   = qtdMrrServ > 0 ? totalMrrServ / qtdMrrServ : 0;
+  m.ticketMrrBi = qtdMrrBi   > 0 ? totalMrrBi   / qtdMrrBi   : 0;
+  m.qtdMrrServ  = qtdMrrServ;
+  m.qtdMrrBi    = qtdMrrBi;
   return m;
 }
 
@@ -1116,8 +1114,8 @@ function recalc(){
     mc('No-shows',m.noshow,'','amber'),
     mc('Vendidos',m.vendidos,'','orange'),
     mc('Conversao',fmtPct(m.convGeral),'leads > venda','green'),
-    mc('Ticket MRR Serv',fmt(m.ticketMrr),(m.qtdEmpresasVendidas||0)+' empresas unicas','green'),
-    mc('Ticket MRR BI',fmt(m.ticketMrrBi),(m.qtdEmpresasVendidas||0)+' empresas unicas','blue'),
+    mc('Ticket MRR Serv',fmt(m.ticketMrr),(m.qtdMrrServ||0)+' servicos MRR','green'),
+    mc('Ticket MRR BI',fmt(m.ticketMrrBi),(m.qtdMrrBi||0)+' servicos BI','blue'),
     mc('Pagos',m.pagos,'',''),
     mc('Contratos assinados',m.contratosAssin,'','')
   ]);
