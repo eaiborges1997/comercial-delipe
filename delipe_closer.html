@@ -2095,13 +2095,10 @@ var PERFIS_CACHE = {};
 
 async function carregarUsuarios(forceLoad){
   if(!isAdmin && !forceLoad) return;
-  var ul = document.getElementById('users-list');
-  if(!ul) return;
   if(!window._fb){
     setTimeout(function(){ carregarUsuarios(forceLoad); }, 600);
     return;
   }
-  ul.innerHTML = '<div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1rem">Carregando...</div>';
   try {
     var fb = window._fb;
     var snap = await fb.getDocs(fb.collection(fb.db,'usuarios'));
@@ -2113,7 +2110,7 @@ async function carregarUsuarios(forceLoad){
     PERFIS_CACHE = {};
     usuarios.forEach(function(u){ PERFIS_CACHE[u.email] = u; });
 
-    // Popular dropdown de selecao do admin
+    // Popular dropdown — sempre, independente de qual aba esta visivel
     var sel = document.getElementById('admin-closer-select');
     if(sel){
       var valorAtual = sel.value;
@@ -2144,12 +2141,13 @@ async function carregarUsuarios(forceLoad){
           sel.appendChild(opt);
         });
       }
-      // Restaurar seleção anterior se ainda existir
       if(valorAtual) sel.value = valorAtual;
     }
 
-    if(usuarios.length===0){
-      ul.innerHTML='<div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1rem">Nenhum usuario cadastrado ainda. Use o formulario abaixo.</div>';
+    // Renderizar lista de usuarios (so se o elemento existir na aba Config)
+    var ul = document.getElementById('users-list');
+    if(!ul || usuarios.length===0){
+      if(ul) ul.innerHTML='<div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1rem">Nenhum usuario cadastrado ainda. Use o formulario abaixo.</div>';
       return;
     }
     ul.innerHTML='';
