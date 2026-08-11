@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"><!-- v16 -->
+<meta charset="UTF-8"><!-- v32 -->
 <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="pragma" content="no-cache">
 <meta http-equiv="expires" content="0">
@@ -1326,7 +1326,7 @@ function recalc(){
 
   // nivel para PROJECAO: baseado no total vendido — sempre calcula (sem gatilho)
   var totalVendido = leadsVendidos.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto; }, 0);
-  var nivelProj = totalVendido >= PARAMS.totalIdeal ? 'ideal' : 'min';
+  var nivelProj = totalVendido >= PARAMS.totalIdeal ? 'ideal' : 'min'; // sempre min ou ideal, nunca abaixo
   // nivel para REAL: baseado no total pago (gatilho 70k)
   var nivel = gatilhoAtingido ? (totalPago >= PARAMS.totalIdeal ? 'ideal' : 'min') : 'abaixo';
 
