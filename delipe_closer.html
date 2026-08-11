@@ -1162,8 +1162,10 @@ function getMetrics(){
   var empKeys = {};
   vends.forEach(function(l){
     var cnpjLimpo = l.cnpj ? l.cnpj.replace(/\D/g,'') : '';
-    var key = cnpjLimpo.length >= 14 ? cnpjLimpo : ('__nome__'+(l.empresa||'').toLowerCase().trim());
-    if(key && key !== '__nome__') empKeys[key] = true;
+    var key = cnpjLimpo.length >= 14
+      ? 'cnpj_'+cnpjLimpo
+      : 'nome_'+(l.empresa||'').toLowerCase().trim();
+    if(key && key !== 'nome_') empKeys[key] = true;
   });
   m.qtdEmpresasVendidas = Object.keys(empKeys).length;
   return m;
