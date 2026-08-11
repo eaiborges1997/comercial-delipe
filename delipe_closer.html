@@ -613,6 +613,12 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 
   <!-- SOMENTE ADMIN -->
   <div class="admin-only-section" id="admin-only-config">
+    <!-- Botao de migracao temporario -->
+    <div class="card" style="border:.5px solid rgba(255,107,0,.3);background:rgba(255,107,0,.05)">
+      <div class="sec" style="color:#ff6b00">🔧 Ferramenta de Migracao</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:12px">Move NB TELECOM, OAI, Uplink e NETCO de Agosto/2026 para Julho/2026.</div>
+      <button onclick="migrarLeadsParaJulho()" style="padding:8px 20px;background:#ff6b00;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:Inter,sans-serif">Executar Migração</button>
+    </div>
     <div class="card" style="padding:0">
       <details>
         <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
@@ -1561,6 +1567,72 @@ function renderConfig(){
 
 function addServico(){ var n=prompt('Nome do servico:'); if(n&&n.trim()){SERVICOS.push(n.trim());renderConfig();} }
 function addCargo(){ var n=prompt('Nome do cargo:'); if(n&&n.trim()){CARGOS.push(n.trim());renderConfig();} }
+
+// Migracao de leads: move leads especificos de agosto para julho
+async function migrarLeadsParaJulho(){
+  if(!window._fb || !currentUser) { alert('Firebase nao conectado.'); return; }
+  var confirmar = confirm(
+    'Isso vai mover os leads:\n- NB TELECOM\n- OAI\n- Uplink\n- NETCO\n\nDe: lucas__Agosto_2026\nPara: lucas__Julho_2026\n\nConfirmar?'
+  );
+  if(!confirmar) return;
+
+  try {
+    var fb = window._fb;
+    var chaveAgosto = 'lucas_delipe_com__Agosto_2026';
+    var chaveJulho  = 'lucas_delipe_com__Julho_2026';
+    var nomesParaMover = ['nb telecom','oai','uplink','netco'];
+
+    // Carregar agosto
+    var snapAgo = await fb.getDoc(fb.doc(fb.db,'leads',chaveAgosto));
+    if(!snapAgo.exists()) { alert('Documento de Agosto nao encontrado.\nTente a chave: lucas_delipe_com__Agosto_2026'); return; }
+    var dadosAgo = snapAgo.data();
+    var leadsAgo = dadosAgo.leads || [];
+
+    // Separar os que ficam e os que vao para julho
+    var ficam = [];
+    var vaoParaJulho = [];
+    leadsAgo.forEach(function(l){
+      var nome = (l.empresa||'').toLowerCase().trim();
+      if(nomesParaMover.indexOf(nome) >= 0){
+        vaoParaJulho.push(l);
+      } else {
+        ficam.push(l);
+      }
+    });
+
+    if(vaoParaJulho.length === 0){
+      alert('Nenhum lead encontrado com esses nomes em Agosto.\nNomes buscados: ' + nomesParaMover.join(', '));
+      return;
+    }
+
+    // Carregar julho (se existir)
+    var snapJul = await fb.getDoc(fb.doc(fb.db,'leads',chaveJulho));
+    var leadsJulho = (snapJul.exists() && snapJul.data().leads) ? snapJul.data().leads : [];
+
+    // Adicionar leads em julho
+    leadsJulho = leadsJulho.concat(vaoParaJulho);
+
+    // Salvar julho atualizado
+    await fb.setDoc(fb.doc(fb.db,'leads',chaveJulho), {
+      closer: 'lucas@delipe.com',
+      mes: 'Julho',
+      ano: '2026',
+      leads: leadsJulho,
+      updatedAt: Date.now()
+    });
+
+    // Salvar agosto sem os leads movidos
+    await fb.setDoc(fb.doc(fb.db,'leads',chaveAgosto), Object.assign({}, dadosAgo, {
+      leads: ficam,
+      updatedAt: Date.now()
+    }));
+
+    alert('Migrado com sucesso!\n' + vaoParaJulho.length + ' lead(s) movidos para Julho:\n' + vaoParaJulho.map(function(l){return l.empresa;}).join('\n'));
+  } catch(e){
+    alert('Erro: ' + e.message);
+    console.error(e);
+  }
+}
 
 // ==================== FUNCOES ADMIN ====================
 async function carregarListaClosers(){
