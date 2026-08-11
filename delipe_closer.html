@@ -716,7 +716,9 @@ var SERVICOS = [
   'Diagnostico M&A','Pacote de Eventos','Diagnostico de Marketing'
 ];
 var CARGOS   = ['CEO','Dono','Diretor','Gerente','Analista','TI','Outro'];
-var STATUS_REUNIAO = ['—','Realizada','Venda em ligacao','No-show','Cancelada','Aguardando nova data'];
+var STATUS_REUNIAO_INICIAL  = ['—','Realizada/Avancou','Realizada/Nao avancou','Venda em ligacao','No-show','Cancelada','Aguardando nova data'];
+var STATUS_REUNIAO_PROPOSTA = ['—','Realizada','Venda em ligacao','No-show','Cancelada','Aguardando nova data'];
+var STATUS_REUNIAO = STATUS_REUNIAO_PROPOSTA; // alias para followup
 var STATUS_LEAD    = ['Em andamento','Vendido','Nao avancou','Em negociacao','Nao convertido'];
 var QUALIFICACOES  = ['Qualificado+','Qualificado','Desqualificado','Nao e provedor'];
 var CONTRATO_ST    = ['Sem contrato','Nao assinado','Ag assinatura','Em revisao','Assinado'];
@@ -949,7 +951,7 @@ function buildLeadCard(l,i){
   body.appendChild(sectionTitle('Reuniao Inicial (Diagnostico)'));
   var s2=document.createElement('div'); s2.className='grid2'; s2.style.marginBottom='12px';
   s2.appendChild(fieldDateTime('Data da Inicial','dtInicial',l));
-  s2.appendChild(fieldSelect('Status da Inicial','statusInicial',STATUS_REUNIAO,l));
+  s2.appendChild(fieldSelect('Status da Inicial','statusInicial',STATUS_REUNIAO_INICIAL,l));
   body.appendChild(s2);
 
   // -- SECAO 3: REUNIAO DE PROPOSTA --
