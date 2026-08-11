@@ -1120,10 +1120,9 @@ function getMetrics(){
 function recalc(){
   var m=getMetrics();
 
-  // nivel baseado no VALOR PAGO — so comissiona/bonifica se atingiu 70k pago
+  // nivel baseado no VALOR PAGO — calculado adiante junto com gatilhoAtingido
   var leadsPagosCalc = leads.filter(function(l){ return l.status==='Vendido' && l.pago==='Pago'; });
   var totalPago = leadsPagosCalc.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto; }, 0);
-  var nivel = totalPago >= PARAMS.totalIdeal ? 'ideal' : totalPago >= PARAMS.totalMin ? 'min' : 'abaixo';
 
   // Resumo funil
   setMG('resumo-funil',[
@@ -1322,8 +1321,17 @@ function recalc(){
     return {html:comH+comR+'<tr><td>SUBTOTAL</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="ora">'+fmt(totC)+'</td></tr>', total:totC};
   }
 
-  var resProj = calcComissao(leadsVendidos, nivel, c2ativa, valorPorBi);
-  var resReal = calcComissao(leadsPagos,    nivel, c2ativa, valorPorBi);
+  // Gatilho: 70k pago para ativar comissao real
+  var gatilhoAtingido = totalPago >= PARAMS.totalMin;
+
+  // nivel para PROJECAO: baseado no total vendido — sempre calcula (sem gatilho)
+  var totalVendido = leadsVendidos.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto; }, 0);
+  var nivelProj = totalVendido >= PARAMS.totalIdeal ? 'ideal' : 'min';
+  // nivel para REAL: baseado no total pago (gatilho 70k)
+  var nivel = gatilhoAtingido ? (totalPago >= PARAMS.totalIdeal ? 'ideal' : 'min') : 'abaixo';
+
+  var resProj = calcComissao(leadsVendidos, nivelProj, c2ativa, valorPorBi);
+  var resReal = calcComissao(leadsPagos,    nivel,     c2ativa, valorPorBi);
 
   var tpj = document.getElementById('comissao-table-proj');
   var trl = document.getElementById('comissao-table-real');
@@ -1331,7 +1339,6 @@ function recalc(){
   if(trl) trl.innerHTML = resReal.html;
 
   // Totais com campanhas — so existem se atingiu 70k pago
-  var gatilhoAtingido = totalPago >= PARAMS.totalMin;
 
   // Projecao: sem gatilho — mostra sempre (e apenas projecao)
   // Real: so mostra se 70k pago atingido
