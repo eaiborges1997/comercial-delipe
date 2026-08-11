@@ -733,8 +733,7 @@ function duplicarLead(id){
   var copia=JSON.parse(JSON.stringify(orig));
   copia.id=++leadId;
   copia.empresa=orig.empresa+' (copia)';
-  copia.dtAgendamento=''; copia.dtInicial=''; copia.dtProposta='';
-  copia.dtFollowup=''; copia.dtContrato=''; copia.dtPagamento='';
+  copia.dtContrato=''; copia.dtPagamento='';
   copia.status='Em andamento'; copia.contrato='Nao assinado';
   copia.pago='Ag pagamento';
   copia.mrrServ=0; copia.mrrBi=0; copia.evento=0; copia.impl=0; copia.produto=0;
