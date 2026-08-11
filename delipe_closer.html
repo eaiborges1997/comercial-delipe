@@ -2649,17 +2649,25 @@ async function carregarTrimestre(){
     if(tm){
       tm.innerHTML = dadosMeses.map(function(d){
         var v=d.leads.filter(function(l){return l.status==='Vendido';});
-        var mrrM=v.reduce(function(s,l){return s+(l.mrrServ||0);},0);
-        var mrrBiM=v.reduce(function(s,l){return s+(l.mrrBi||0);},0);
-        var combM=v.reduce(function(s,l){return s+(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.projetoPersonalizado||0)+(l.impl||0);},0);
-        return '<div style="padding:12px 0;border-bottom:.5px solid rgba(255,255,255,.07)">'
-          +'<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:8px">'+d.mes+'</div>'
-          +'<div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:rgba(255,255,255,.5)">'
-          +'<span>Leads: <strong style="color:#fff">'+d.leads.length+'</strong></span>'
-          +'<span>Vendidos: <strong style="color:#ff6b00">'+v.length+'</strong></span>'
-          +'<span>MRR Serv: <strong style="color:#1baf7a">'+fmt(mrrM)+'</strong></span>'
-          +'<span>MRR BI: <strong style="color:#2a78d6">'+fmt(mrrBiM)+'</strong></span>'
-          +'<span>Total Combinado: <strong style="color:#ff6b00">'+fmt(combM)+'</strong></span>'
+        var mrrM   = v.reduce(function(s,l){return s+(l.mrrServ||0);},0);
+        var mrrBiM = v.reduce(function(s,l){return s+(l.mrrBi||0);},0);
+        var prodM  = v.reduce(function(s,l){return s+(l.produto||0);},0);
+        var evM    = v.reduce(function(s,l){return s+(l.evento||0);},0);
+        var projM  = v.reduce(function(s,l){return s+(l.projetoPersonalizado||0);},0);
+        var implM  = v.reduce(function(s,l){return s+(l.impl||0);},0);
+        var combM  = mrrM+mrrBiM+prodM+evM+projM+implM;
+        return '<div style="padding:14px 0;border-bottom:.5px solid rgba(255,255,255,.07)">'
+          +'<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:10px">'+d.mes+'</div>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:12px 24px;font-size:12px">'
+          +'<span style="color:rgba(255,255,255,.5)">Leads: <strong style="color:#fff">'+d.leads.length+'</strong></span>'
+          +'<span style="color:rgba(255,255,255,.5)">Vendidos: <strong style="color:#ff6b00">'+v.length+'</strong></span>'
+          +(mrrM?'<span style="color:rgba(255,255,255,.5)">MRR Serv: <strong style="color:#1baf7a">'+fmt(mrrM)+'</strong></span>':'')
+          +(mrrBiM?'<span style="color:rgba(255,255,255,.5)">MRR BI: <strong style="color:#2a78d6">'+fmt(mrrBiM)+'</strong></span>':'')
+          +(prodM?'<span style="color:rgba(255,255,255,.5)">Produto: <strong style="color:#ff6b00">'+fmt(prodM)+'</strong></span>':'')
+          +(evM?'<span style="color:rgba(255,255,255,.5)">Evento: <strong style="color:#ff6b00">'+fmt(evM)+'</strong></span>':'')
+          +(projM?'<span style="color:rgba(255,255,255,.5)">Proj. Personalizado: <strong style="color:#ff6b00">'+fmt(projM)+'</strong></span>':'')
+          +(implM?'<span style="color:rgba(255,255,255,.5)">Implantacao: <strong style="color:rgba(255,255,255,.4)">'+fmt(implM)+'</strong></span>':'')
+          +'<span style="color:rgba(255,255,255,.5)">Total Combinado: <strong style="color:#ff6b00">'+fmt(combM)+'</strong></span>'
           +'</div></div>';
       }).join('');
     }
