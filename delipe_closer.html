@@ -1251,11 +1251,16 @@ function recalc(){
       var tot=comServ+comBi+comProd;
       totC+=tot;
 
-      // Taxa exibida no cabeçalho: se todos os leads do canal forem Delipe One, mostra taxa especial
-      var todosDelipeOne = cLeads.length>0 && cLeads.every(function(l){return l.servico==='Delipe One';});
+      // Taxa exibida: se todos Delipe One mostra taxa especial; se misturado mostra "misto"
+      var qtdDelipeOne = cLeads.filter(function(l){ return l.servico==='Delipe One'; }).length;
+      var todosDelipeOne = cLeads.length>0 && qtdDelipeOne===cLeads.length;
+      var algumDelipeOne = qtdDelipeOne>0 && qtdDelipeOne<cLeads.length;
+      var taxaEspec = (c==='Evento'||c==='Trafego Pago') ? '2,5%' : '5,0%';
       var taxaExib = todosDelipeOne
-        ? ((c==='Evento'||c==='Trafego Pago')?'2,5%':'5,0%')
-        : (mrrServ&&pM?(pM*100).toFixed(1)+'%':'--');
+        ? taxaEspec+' (D1)'
+        : algumDelipeOne
+          ? (pM?(pM*100).toFixed(1)+'%':taxaEspec)+' +D1'
+          : (mrrServ&&pM?(pM*100).toFixed(1)+'%':'--');
 
       var biCell=c2ativo?(qtdBi>0?qtdBi+'x '+fmt(valorBI):'--'):(mrrBi?(pM*100).toFixed(1)+'%':'--');
       return '<tr><td>'+c+'</td>'
