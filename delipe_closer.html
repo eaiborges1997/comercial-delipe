@@ -1001,7 +1001,20 @@ function fieldWrap(lbl){
 function fieldText(lbl,campo,l,ph){
   var w=fieldWrap(lbl);
   var inp=document.createElement('input'); inp.type='text'; inp.value=l[campo]||''; inp.placeholder=ph||lbl;
-  inp.oninput=(function(lid,c){return function(){updateLead(lid,c,this.value);};})(l.id,campo);
+  inp.oninput=(function(lid,c){return function(){
+    updateLead(lid,c,this.value);
+    // Atualizar titulo do card em tempo real quando for o campo empresa
+    if(c==='empresa'){
+      var card=document.getElementById('lead-card-'+lid);
+      if(card){
+        var nomeEl=card.querySelector('.lead-empresa');
+        if(nomeEl){
+          nomeEl.textContent=this.value||'Empresa nao informada';
+          nomeEl.className='lead-empresa'+(this.value?'':' lead-empresa-empty');
+        }
+      }
+    }
+  };})(l.id,campo);
   w.appendChild(inp); return w;
 }
 function fieldTelEmail(lbl,campo,l,type){
