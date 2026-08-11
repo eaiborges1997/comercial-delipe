@@ -51,6 +51,7 @@ textarea{resize:vertical;min-height:60px}
 .lead-cards{display:flex;flex-direction:column;gap:12px}
 .lead-card{background:rgba(255,255,255,.03);border:.5px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;transition:border-color .2s}
 .lead-card:hover{border-color:rgba(255,107,0,.2)}
+.lead-card.sdr-origin{border-color:rgba(42,120,214,.35);background:rgba(42,120,214,.03)}
 
 .lead-card-header{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none}
 .lead-card-header:hover{background:rgba(255,255,255,.02)}
@@ -299,7 +300,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged }
     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
   import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs,
-    query, where, orderBy, writeBatch, serverTimestamp }
+    query, where, orderBy, writeBatch, serverTimestamp, onSnapshot }
     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   const firebaseConfig = {
@@ -322,7 +323,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   // Expor globalmente
   window._fb = { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged,
     GoogleAuthProvider, doc, getDoc, setDoc, deleteDoc, collection, getDocs,
-    query, where, orderBy, writeBatch, serverTimestamp, ADMINS };
+    query, where, orderBy, writeBatch, serverTimestamp, onSnapshot, ADMINS };
 
   // Expor login globalmente a partir do modulo
   window._fbLogin = function(){
@@ -581,6 +582,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
     <div class="sec">Meus leads</div>
     <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:12px">Exibindo apenas os leads onde voce e o SDR responsavel.</div>
     <div class="lead-cards" id="sdr-lead-cards"></div>
+    <button class="add-lead-btn" onclick="addSdrLead()">+ Adicionar lead</button>
   </div>
   <div class="card">
     <div class="sec">Resumo rapido</div>
@@ -629,6 +631,7 @@ var leadId = 0;
 
 var CANAIS   = ['Trafego Pago','Evento','SDR','Base','Indicacao'];
 var SDRS     = ['LUCAS','ADRIELLE','CLEITO','PAULO','VINI','OUTRO'];
+var CLOSERS  = ['Lucas','David','Sabrina','Gabriel','Cleiton','Greison','Danilo','Mauricio'];
 // Mapeamento email -> nome SDR para filtrar leads
 var SDR_EMAILS = {
   'adrielle@delipe.com': 'ADRIELLE',
@@ -703,7 +706,7 @@ function newLead(){
     dtAgendamento:'', empresa:'', cnpj:'',
     contatoNome:'', contatoTel:'', contatoEmail:'', cargo:CARGOS[0],
     qualificacao:QUALIFICACOES[0], assinantes:'',
-    canal:CANAIS[0], sdr:SDRS[0],
+    canal:CANAIS[0], sdr:SDRS[0], closer:CLOSERS[0],
     dtInicial:'', statusInicial:'—',
     dtProposta:'', statusProposta:'—',
     dtFollowup:'', statusFollowup:'—',
@@ -775,7 +778,7 @@ function renderLeads(){
 
 function buildLeadCard(l,i){
   var card=document.createElement('div');
-  card.className='lead-card';
+  card.className='lead-card' + (l._deSdr ? ' sdr-origin' : '');
   card.id='lead-card-'+l.id;
 
   // HEADER
@@ -792,7 +795,9 @@ function buildLeadCard(l,i){
 
   var tags=document.createElement('div');
   tags.className='lead-tags';
-  tags.innerHTML=qualBadge(l.qualificacao)+statusTag(l.status)+canalTag(l.canal);
+  var closerTag = l.closer ? '<span class="lead-canal-tag" style="background:rgba(255,107,0,.12);color:#ff6b00">'+l.closer+'</span>' : '';
+  var sdrBadge  = l._deSdr ? '<span class="lead-canal-tag" style="background:rgba(42,120,214,.18);color:#2a78d6;font-weight:600">📥 Lead do SDR'+(l._sdrNome?' – '+l._sdrNome:'')+'</span>' : '';
+  tags.innerHTML=qualBadge(l.qualificacao)+statusTag(l.status)+canalTag(l.canal)+closerTag+sdrBadge;
 
   var mrr=document.createElement('span');
   mrr.className='lead-mrr';
@@ -823,6 +828,7 @@ function buildLeadCard(l,i){
   s1b.appendChild(fieldText('Qtd. assinantes','assinantes',l,'Ex: 3500'));
   s1b.appendChild(fieldSelect('Canal','canal',CANAIS,l));
   s1b.appendChild(fieldSelect('SDR / BDR','sdr',SDRS,l));
+  s1b.appendChild(fieldSelect('Closer responsavel','closer',CLOSERS,l));
   s1b.appendChild(fieldSelect('Servico / Produto','servico',SERVICOS.concat(['Outro']),l));
   body.appendChild(s1b);
 
@@ -1189,23 +1195,42 @@ function recalc(){
     var comH='<tr><th>Canal</th><th>MRR Serv</th><th>MRR BI</th><th>% MRR Serv</th><th>Comissao BI</th><th>Prod/Impl</th><th>% Prod</th><th>Total</th></tr>';
     var comR=CANAIS.map(function(c){
       var cLeads=filtroLeads.filter(function(l){return l.canal===c;});
-      var mrrServ=cLeads.reduce(function(s,l){return s+l.mrrServ;},0);
-      var mrrBi=cLeads.reduce(function(s,l){return s+l.mrrBi;},0);
-      var qtdBi=cLeads.filter(function(l){return l.mrrBi>0;}).length;
-      var prod=cLeads.reduce(function(s,l){return s+l.impl+l.evento+l.produto;},0);
       var p=PARAMS.comissao[c];
       var pM=nivelParam==='abaixo'?0:(nivelParam==='ideal'?p.mrrIdeal:p.mrrMin);
       var pP=nivelParam==='abaixo'?0:(nivelParam==='ideal'?p.prodIdeal:p.prodMin);
-      var comServ=mrrServ*pM;
+
+      // Calcular MRR Serv separando Delipe One (taxa especial) dos demais
+      var mrrServ=0, comServ=0;
+      cLeads.forEach(function(l){
+        mrrServ += l.mrrServ;
+        if(l.servico === 'Delipe One'){
+          // Taxa especial: 2.5% para Evento/Trafego Pago, 5% para outros canais
+          var taxaDelipeOne = (c==='Evento'||c==='Trafego Pago') ? 0.025 : 0.05;
+          comServ += l.mrrServ * taxaDelipeOne;
+        } else {
+          comServ += l.mrrServ * pM;
+        }
+      });
+
+      var mrrBi=cLeads.reduce(function(s,l){return s+l.mrrBi;},0);
+      var qtdBi=cLeads.filter(function(l){return l.mrrBi>0;}).length;
+      var prod=cLeads.reduce(function(s,l){return s+l.impl+l.evento+l.produto;},0);
       var comBi=c2ativo?(qtdBi*valorBI):(mrrBi*pM);
       var comProd=prod*pP;
       var tot=comServ+comBi+comProd;
       totC+=tot;
+
+      // Taxa exibida no cabeçalho: se todos os leads do canal forem Delipe One, mostra taxa especial
+      var todosDelipeOne = cLeads.length>0 && cLeads.every(function(l){return l.servico==='Delipe One';});
+      var taxaExib = todosDelipeOne
+        ? ((c==='Evento'||c==='Trafego Pago')?'2,5%':'5,0%')
+        : (mrrServ&&pM?(pM*100).toFixed(1)+'%':'--');
+
       var biCell=c2ativo?(qtdBi>0?qtdBi+'x '+fmt(valorBI):'--'):(mrrBi?(pM*100).toFixed(1)+'%':'--');
       return '<tr><td>'+c+'</td>'
         +'<td>'+(mrrServ?fmt(mrrServ):'--')+'</td>'
         +'<td>'+(mrrBi?fmt(mrrBi):'--')+'</td>'
-        +'<td>'+(mrrServ&&pM?(pM*100).toFixed(1)+'%':'--')+'</td>'
+        +'<td>'+(mrrServ?taxaExib:'--')+'</td>'
         +'<td class="'+(c2ativo&&qtdBi>0?'grn':'')+'">'+(mrrBi?biCell:'--')+'</td>'
         +'<td>'+(prod?fmt(prod):'--')+'</td>'
         +'<td>'+(prod&&pP?(pP*100).toFixed(1)+'%':'--')+'</td>'
@@ -1480,7 +1505,146 @@ function getSdrLeads(){
   return leads.filter(function(l){ return l.sdr && l.sdr.toUpperCase()===nome.toUpperCase(); });
 }
 
-function recalcSdr(){
+function addSdrLead(){
+  var nl = newLead();
+  var sdrNome = (window._sdrNome || '').toUpperCase();
+  if(sdrNome && SDRS.indexOf(sdrNome) >= 0) nl.sdr = sdrNome;
+  nl._deSdr = true; // marca como originado pelo SDR
+  leads.push(nl);
+  agendarSalvamento();
+  recalcSdr();
+}
+
+// Quando o SDR salva um lead com closer apontado, replica no documento do closer
+async function replicarLeadNoCloser(lead){
+  if(!window._fb || !currentUser || !lead.closer) return;
+  try {
+    var fb = window._fb;
+    // Buscar email do closer na colecao de usuarios
+    var snap = await fb.getDocs(fb.collection(fb.db,'usuarios'));
+    var closerEmail = null;
+    snap.forEach(function(d){
+      var u = d.data();
+      var nomeU = (u.nome||'').trim().toLowerCase();
+      var nomeCloser = (lead.closer||'').trim().toLowerCase();
+      if(nomeU === nomeCloser && u.perfil !== 'sdr') closerEmail = u.email;
+    });
+    if(!closerEmail){ console.log('Closer nao encontrado no Firestore:', lead.closer); return; }
+
+    // Chave do documento do closer para o mes/ano atual
+    var ma = getMesAno();
+    var emailKey = closerEmail.replace(/[^a-zA-Z0-9]/g,'_');
+    var chaveCloser = emailKey + '__' + ma.mes + '_' + ma.ano;
+
+    // Carregar leads atuais do closer
+    var docRef = fb.doc(fb.db,'leads',chaveCloser);
+    var snapCloser = await fb.getDoc(docRef);
+    var closerLeads = (snapCloser.exists() && snapCloser.data().leads) ? snapCloser.data().leads : [];
+
+    // Verificar se ja existe um lead com mesmo sdrLeadId — se sim, atualizar campos do SDR
+    var idxExistente = closerLeads.findIndex(function(l){ return l.sdrLeadId && l.sdrLeadId === lead.sdrLeadId; });
+    if(idxExistente >= 0){
+      // Atualizar apenas campos que o SDR pode ter editado (nao sobrescrever o que o closer ja preencheu)
+      var CAMPOS_SDR_ATUALIZA = ['empresa','cnpj','contatoNome','contatoTel','contatoEmail',
+        'cargo','qualificacao','assinantes','canal','sdr','closer','servico','dtAgendamento','obs'];
+      CAMPOS_SDR_ATUALIZA.forEach(function(campo){
+        if(lead[campo] !== undefined) closerLeads[idxExistente][campo] = lead[campo];
+      });
+      closerLeads[idxExistente]._sdrNome = window._sdrNome || '';
+    } else {
+      // Criar copia para o closer marcada como originada pelo SDR
+      var leadParaCloser = JSON.parse(JSON.stringify(lead));
+      leadParaCloser.sdrLeadId = currentUser.email + '_' + lead.id;
+      leadParaCloser._deSdr = true;
+      leadParaCloser._sdrNome = window._sdrNome || '';
+
+      // Ajustar id para nao conflitar com leads do closer
+      var maxId = 0;
+      closerLeads.forEach(function(l){ if(l.id > maxId) maxId = l.id; });
+      leadParaCloser.id = maxId + 1;
+      closerLeads.push(leadParaCloser);
+    }
+
+    // Salvar no documento do closer
+    await fb.setDoc(docRef, {
+      closer: closerEmail,
+      mes: ma.mes,
+      ano: ma.ano,
+      leads: closerLeads,
+      updatedAt: Date.now()
+    });
+    console.log('Lead replicado para closer:', lead.closer, '(' + closerEmail + ')');
+  } catch(e){ console.error('Erro ao replicar lead no closer:', e); }
+}
+
+// Campos que o closer edita e que devem ser sincronizados de volta para o SDR
+var CAMPOS_SYNC_CLOSER = [
+  'status','qualificacao','dtInicial','statusInicial',
+  'dtProposta','statusProposta','dtFollowup','statusFollowup',
+  'mrrServ','mrrBi','evento','impl','produto',
+  'contrato','pago','dtPagamento','servico','obs',
+  'empresa','cnpj','contatoNome','contatoTel','contatoEmail','cargo',
+  'assinantes','dtAgendamento','canal'
+];
+
+// Quando o closer edita um lead de origem SDR, sincronizar de volta no doc do SDR
+async function sincronizarDeVoltaParaSdr(lead){
+  if(!window._fb || !currentUser || !lead.sdrLeadId) return;
+  try {
+    var fb = window._fb;
+    // sdrLeadId = "email_sdr_id_lead"  ex: "adrielle_delipe_com_3"
+    // Extrair email do SDR: tudo antes do ultimo "_" + numero
+    var partes = lead.sdrLeadId.split('_');
+    // O id do lead é o último segmento numérico
+    var leadIdSdr = partes[partes.length-1];
+    // Email do SDR: substituir "_" por chars originais buscando na colecao
+    var snap = await fb.getDocs(fb.collection(fb.db,'usuarios'));
+    var sdrEmail = null;
+    snap.forEach(function(d){
+      var u = d.data();
+      if(u.perfil === 'sdr'){
+        var emailKey = u.email.replace(/[^a-zA-Z0-9]/g,'_');
+        var prefix = emailKey + '_' + leadIdSdr;
+        if(lead.sdrLeadId === prefix) sdrEmail = u.email;
+      }
+    });
+    if(!sdrEmail){ return; }
+
+    var ma = getMesAno();
+    var emailKey = sdrEmail.replace(/[^a-zA-Z0-9]/g,'_');
+    var chaveSdr = emailKey + '__' + ma.mes + '_' + ma.ano;
+
+    var docRef = fb.doc(fb.db,'leads',chaveSdr);
+    var snapSdr = await fb.getDoc(docRef);
+    if(!snapSdr.exists()) return;
+
+    var sdrLeads = snapSdr.data().leads || [];
+    var idx = sdrLeads.findIndex(function(l){
+      return l.sdrLeadId && l.sdrLeadId === lead.sdrLeadId;
+    });
+    if(idx === -1){
+      // Busca alternativa por id original
+      idx = sdrLeads.findIndex(function(l){ return String(l.id) === String(leadIdSdr); });
+    }
+    if(idx === -1) return;
+
+    // Sincronizar campos editados pelo closer de volta para o lead do SDR
+    CAMPOS_SYNC_CLOSER.forEach(function(campo){
+      if(lead[campo] !== undefined) sdrLeads[idx][campo] = lead[campo];
+    });
+
+    await fb.setDoc(docRef,{
+      closer: sdrEmail,
+      mes: ma.mes,
+      ano: ma.ano,
+      leads: sdrLeads,
+      updatedAt: Date.now()
+    });
+    console.log('Sincronizado de volta para SDR:', sdrEmail);
+  } catch(e){ console.error('Erro ao sincronizar para SDR:', e); }
+}
+
+
   var sdrLeads = getSdrLeads();
   var nome = window._sdrNome || '';
 
@@ -1675,6 +1839,7 @@ function mostrarApp(user){
     mostrarAbasSdr();
     window._sdrNome = SDR_EMAILS[user.email] || nome.toUpperCase();
     recalcSdr();
+    setTimeout(iniciarListenerSdr, 1000); // iniciar listener em tempo real
   } else {
     document.getElementById('admin-bar').classList.remove('visible');
     document.getElementById('admin-only-config').classList.remove('visible');
@@ -2038,6 +2203,27 @@ async function salvarNoFirestore(){
       leads: leads,
       updatedAt: Date.now()
     });
+
+    // Se for SDR, replicar leads com closer apontado
+    if(window._isSdr){
+      var leadsComCloser = leads.filter(function(l){ return l.closer && l._deSdr; });
+      for(var i=0; i<leadsComCloser.length; i++){
+        // Garantir sdrLeadId antes de replicar
+        if(!leadsComCloser[i].sdrLeadId){
+          leadsComCloser[i].sdrLeadId = currentUser.email + '_' + leadsComCloser[i].id;
+        }
+        await replicarLeadNoCloser(leadsComCloser[i]);
+      }
+    }
+
+    // Se for CLOSER, sincronizar de volta para o SDR os leads com origem SDR
+    if(!window._isSdr){
+      var leadsSdrOrigem = leads.filter(function(l){ return l._deSdr && l.sdrLeadId; });
+      for(var j=0; j<leadsSdrOrigem.length; j++){
+        await sincronizarDeVoltaParaSdr(leadsSdrOrigem[j]);
+      }
+    }
+
     setSyncStatus('connected','Salvo automaticamente');
   } catch(e){
     console.error('Erro ao salvar:', e);
@@ -2295,9 +2481,41 @@ function getSdrLeads(){
   return leads.filter(function(l){ return l.sdr && l.sdr.toUpperCase()===nome.toUpperCase(); });
 }
 
-function recalcSdr(){
-  var sdrLeads = getSdrLeads();
-  var nome = window._sdrNome || '';
+// Listener em tempo real para o SDR detectar quando o closer atualizou um lead
+var _sdrUnsubscribe = null;
+function iniciarListenerSdr(){
+  if(!window._isSdr || !currentUser || !window._fb) return;
+  // Cancelar listener anterior se existir
+  if(_sdrUnsubscribe){ _sdrUnsubscribe(); _sdrUnsubscribe = null; }
+
+  var ma = getMesAno();
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var chave = emailKey + '__' + ma.mes + '_' + ma.ano;
+  var fb = window._fb;
+  var docRef = fb.doc(fb.db,'leads',chave);
+
+  _sdrUnsubscribe = fb.onSnapshot(docRef, function(snap){
+    // Ignorar se o proprio SDR acabou de salvar (evita loop)
+    if(isSaving) return;
+    if(snap.exists() && snap.data().leads){
+      var novosLeads = snap.data().leads;
+      // Checar se mudou (comparando updatedAt)
+      var updatedAt = snap.data().updatedAt || 0;
+      if(updatedAt > (_lastSdrUpdate || 0)){
+        _lastSdrUpdate = updatedAt;
+        leads = novosLeads;
+        leadId = 0;
+        leads.forEach(function(l){ if(l.id > leadId) leadId = l.id; });
+        recalcSdr();
+        setSyncStatus('connected','Closer atualizou um lead — sincronizado!');
+        setTimeout(function(){ setSyncStatus('connected','Dados salvos automaticamente no Firestore'); }, 3000);
+      }
+    }
+  }, function(e){ console.error('Listener SDR erro:', e); });
+}
+var _lastSdrUpdate = 0;
+
+
 
   // Metricas
   var totalLeads     = sdrLeads.length;
