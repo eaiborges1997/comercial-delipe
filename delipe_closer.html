@@ -743,9 +743,27 @@ function duplicarLead(id){
   leads.splice(idx+1,0,copia);
   renderLeads();
 }
+function verificarAtraso(l){
+  // Se ja esta Pago ou Nao se aplica, nao alterar
+  if(l.pago==='Pago' || l.pago==='Nao se aplica') return;
+  if(!l.dtPagamento) return;
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var venc = new Date(l.dtPagamento+'T00:00:00');
+  if(venc < hoje){
+    l.pago = 'Atrasado';
+  } else if(l.pago==='Atrasado'){
+    // Vencimento foi alterado para data futura, volta para Ag pagamento
+    l.pago = 'Ag pagamento';
+  }
+}
+
 function updateLead(id,campo,val){
   var l=leads.find(function(x){return x.id===id;});
-  if(l){l[campo]=val;recalc();}
+  if(l){
+    l[campo]=val;
+    if(campo==='dtPagamento' || campo==='pago') verificarAtraso(l);
+    recalc();
+  }
 }
 function updateLeadCurr(id,campo,el){
   onCurrency(el,function(){ updateLead(id,campo,parseCurrency(el.value)); });
@@ -784,6 +802,8 @@ function renderLeads(){
 }
 
 function buildLeadCard(l,i){
+  // Verificar atraso automaticamente ao renderizar
+  verificarAtraso(l);
   var card=document.createElement('div');
   card.className='lead-card' + (l._deSdr ? ' sdr-origin' : '');
   card.id='lead-card-'+l.id;
@@ -890,7 +910,7 @@ function buildLeadCard(l,i){
   var s5=document.createElement('div'); s5.className='grid4'; s5.style.marginBottom='12px';
   s5.appendChild(fieldSelect('Status do lead','status',STATUS_LEAD,l));
   s5.appendChild(fieldSelect('Contrato','contrato',CONTRATO_ST,l));
-  s5.appendChild(fieldSelect('Pagamento','pago',['Ag pagamento','Pago','Nao se aplica'],l));
+  s5.appendChild(fieldSelect('Pagamento','pago',['Ag pagamento','Pago','Atrasado','Nao se aplica'],l));
   s5.appendChild(fieldDate('Data do pagamento','dtPagamento',l));
   body.appendChild(s5);
 
