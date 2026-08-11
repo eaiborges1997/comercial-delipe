@@ -540,23 +540,47 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
           <input type="text" id="cfg-mrr-ideal" placeholder="40.000,00" oninput="onCfgCurrency(this,'mrrIdeal')"></div></div>
     </div>
   </div>
-  <div class="card">
-    <div class="sec" onclick="toggleCfg('servicos')" style="cursor:pointer;user-select:none">Servicos / Produtos <span id="chev-servicos" style="font-size:11px;color:rgba(255,255,255,.35);margin-left:6px">▼</span></div>
-    <div id="cfg-servicos-wrap"></div>
-    <button class="add-lead-btn" onclick="addServico()">+ Adicionar servico</button>
+  <div class="card" style="padding:0">
+    <details>
+      <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
+        SERVICOS / PRODUTOS <span style="font-size:11px;color:rgba(255,255,255,.35)">▼</span>
+      </summary>
+      <div style="padding:0 1.5rem 1.5rem">
+        <div id="cfg-servicos-wrap"></div>
+        <button class="add-lead-btn" onclick="addServico()">+ Adicionar servico</button>
+      </div>
+    </details>
   </div>
-  <div class="card">
-    <div class="sec" onclick="toggleCfg('cargos')" style="cursor:pointer;user-select:none">Cargos <span id="chev-cargos" style="font-size:11px;color:rgba(255,255,255,.35);margin-left:6px">▼</span></div>
-    <div id="cfg-cargos-wrap"></div>
-    <button class="add-lead-btn" onclick="addCargo()">+ Adicionar cargo</button>
+  <div class="card" style="padding:0">
+    <details>
+      <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
+        CARGOS <span style="font-size:11px;color:rgba(255,255,255,.35)">▼</span>
+      </summary>
+      <div style="padding:0 1.5rem 1.5rem">
+        <div id="cfg-cargos-wrap"></div>
+        <button class="add-lead-btn" onclick="addCargo()">+ Adicionar cargo</button>
+      </div>
+    </details>
   </div>
-  <div class="card">
-    <div class="sec" onclick="toggleCfg('canais')" style="cursor:pointer;user-select:none">Comissao por canal <span id="chev-canais" style="font-size:11px;color:rgba(255,255,255,.35);margin-left:6px">▼</span></div>
-    <div id="cfg-canais-body" style="overflow-x:auto"><table class="canal-table" id="cfg-canais-table"></table></div>
+  <div class="card" style="padding:0">
+    <details open>
+      <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
+        COMISSAO POR CANAL <span style="font-size:11px;color:rgba(255,255,255,.35)">▼</span>
+      </summary>
+      <div style="padding:0 1.5rem 1.5rem;overflow-x:auto">
+        <table class="canal-table" id="cfg-canais-table"></table>
+      </div>
+    </details>
   </div>
-  <div class="card">
-    <div class="sec" onclick="toggleCfg('bonus')" style="cursor:pointer;user-select:none">Bonus qualitativos <span id="chev-bonus" style="font-size:11px;color:rgba(255,255,255,.35);margin-left:6px">▼</span></div>
-    <div id="cfg-bonus-body"><div class="grid4" id="cfg-bonus-wrap"></div></div>
+  <div class="card" style="padding:0">
+    <details open>
+      <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
+        BONUS QUALITATIVOS <span style="font-size:11px;color:rgba(255,255,255,.35)">▼</span>
+      </summary>
+      <div style="padding:0 1.5rem 1.5rem">
+        <div class="grid4" id="cfg-bonus-wrap"></div>
+      </div>
+    </details>
   </div>
 
   <!-- SOMENTE ADMIN -->
@@ -1462,37 +1486,6 @@ function renderConfig(){
 
 function addServico(){ var n=prompt('Nome do servico:'); if(n&&n.trim()){SERVICOS.push(n.trim());renderConfig();} }
 function addCargo(){ var n=prompt('Nome do cargo:'); if(n&&n.trim()){CARGOS.push(n.trim());renderConfig();} }
-
-// Controle de expansao das secoes de config
-var _cfgOpen = { servicos:false, cargos:false, canais:true, bonus:true };
-function toggleCfg(id){
-  _cfgOpen[id] = !_cfgOpen[id];
-  var bodies = {
-    servicos: ['cfg-servicos-wrap'],
-    cargos:   ['cfg-cargos-wrap'],
-    canais:   ['cfg-canais-body'],
-    bonus:    ['cfg-bonus-body']
-  };
-  var bodyIds = bodies[id] || [];
-  bodyIds.forEach(function(bid){
-    var el = document.getElementById(bid);
-    if(el) el.style.display = _cfgOpen[id] ? '' : 'none';
-  });
-  // Botoes add ficam dentro do card — controlar via closest
-  var btns = {
-    servicos: document.querySelector('button[onclick="addServico()"]'),
-    cargos:   document.querySelector('button[onclick="addCargo()"]')
-  };
-  if(btns[id]) btns[id].style.display = _cfgOpen[id] ? '' : 'none';
-  var chev = document.getElementById('chev-'+id);
-  if(chev) chev.textContent = _cfgOpen[id] ? '▼' : '▶';
-}
-// Inicializar estado
-(function(){
-  Object.keys(_cfgOpen).forEach(function(id){
-    if(!_cfgOpen[id]) toggleCfg(id);
-  });
-})();
 
 // ==================== FUNCOES ADMIN ====================
 async function carregarListaClosers(){
