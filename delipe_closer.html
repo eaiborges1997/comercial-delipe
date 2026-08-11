@@ -2112,6 +2112,42 @@ async function carregarUsuarios(forceLoad){
     });
     PERFIS_CACHE = {};
     usuarios.forEach(function(u){ PERFIS_CACHE[u.email] = u; });
+
+    // Popular dropdown de selecao do admin
+    var sel = document.getElementById('admin-closer-select');
+    if(sel){
+      var valorAtual = sel.value;
+      sel.innerHTML = '<option value="">-- Selecione --</option>';
+      var naoSdrs = usuarios.filter(function(u){ return u.perfil !== 'sdr'; });
+      var sdrs    = usuarios.filter(function(u){ return u.perfil === 'sdr'; });
+      naoSdrs.sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
+      sdrs.sort(function(a,b){    return (a.nome||'').localeCompare(b.nome||''); });
+      naoSdrs.forEach(function(u){
+        var opt = document.createElement('option');
+        opt.value = u.email;
+        var lbl = (u.nome||u.email.split('@')[0]);
+        lbl = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+        if(u.perfil==='admin') lbl += ' (Admin)';
+        opt.textContent = lbl;
+        sel.appendChild(opt);
+      });
+      if(sdrs.length > 0){
+        var sep = document.createElement('option');
+        sep.disabled = true; sep.textContent = '── SDRs ──';
+        sel.appendChild(sep);
+        sdrs.forEach(function(u){
+          var opt = document.createElement('option');
+          opt.value = u.email;
+          var lbl = (u.nome||u.email.split('@')[0]);
+          lbl = lbl.charAt(0).toUpperCase()+lbl.slice(1)+' (SDR)';
+          opt.textContent = lbl;
+          sel.appendChild(opt);
+        });
+      }
+      // Restaurar seleção anterior se ainda existir
+      if(valorAtual) sel.value = valorAtual;
+    }
+
     if(usuarios.length===0){
       ul.innerHTML='<div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1rem">Nenhum usuario cadastrado ainda. Use o formulario abaixo.</div>';
       return;
