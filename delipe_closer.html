@@ -1157,6 +1157,15 @@ function getMetrics(){
   m.ticketMrrBi = qtdMrrBi   > 0 ? totalMrrBi   / qtdMrrBi   : 0;
   m.qtdMrrServ  = qtdMrrServ;
   m.qtdMrrBi    = qtdMrrBi;
+
+  // Empresas vendidas unicas por CNPJ (ou nome se sem CNPJ)
+  var empKeys = {};
+  vends.forEach(function(l){
+    var cnpjLimpo = l.cnpj ? l.cnpj.replace(/\D/g,'') : '';
+    var key = cnpjLimpo.length >= 14 ? cnpjLimpo : ('__nome__'+(l.empresa||'').toLowerCase().trim());
+    if(key && key !== '__nome__') empKeys[key] = true;
+  });
+  m.qtdEmpresasVendidas = Object.keys(empKeys).length;
   return m;
 }
 
