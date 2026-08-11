@@ -662,11 +662,11 @@ var CONTRATO_ST    = ['Sem contrato','Nao assinado','Ag assinatura','Em revisao'
 var PARAMS = {
   totalMin:70000, totalIdeal:140000, mrrMin:20000, mrrIdeal:40000,
   comissao:{
-    'Trafego Pago':{mrrMin:.04,prodMin:.02,mrrIdeal:.06,prodIdeal:.035},
-    'Evento':      {mrrMin:.05,prodMin:.03,mrrIdeal:.075,prodIdeal:.045},
-    'SDR':         {mrrMin:.07,prodMin:.05,mrrIdeal:.105,prodIdeal:.075},
-    'Base':        {mrrMin:.09,prodMin:.07,mrrIdeal:.135,prodIdeal:.105},
-    'Indicacao':   {mrrMin:.15,prodMin:.15,mrrIdeal:.225,prodIdeal:.20}
+    'Trafego Pago':{mrrMin:.04,prodMin:.02,mrrIdeal:.06,prodIdeal:.035,projMin:.025,projIdeal:.025},
+    'Evento':      {mrrMin:.05,prodMin:.03,mrrIdeal:.075,prodIdeal:.045,projMin:.025,projIdeal:.025},
+    'SDR':         {mrrMin:.07,prodMin:.05,mrrIdeal:.105,prodIdeal:.075,projMin:.05,projIdeal:.05},
+    'Base':        {mrrMin:.09,prodMin:.07,mrrIdeal:.135,prodIdeal:.105,projMin:.05,projIdeal:.05},
+    'Indicacao':   {mrrMin:.15,prodMin:.15,mrrIdeal:.225,prodIdeal:.20,projMin:.05,projIdeal:.05}
   },
   bonus:{
     conversao:{label:'Conversao acima de 40%',val:1000},
@@ -719,7 +719,7 @@ function newLead(){
     dtFollowup:'', statusFollowup:'—',
     status:STATUS_LEAD[0],
     servico:SERVICOS[0],
-    mrrServ:0, mrrBi:0, evento:0, impl:0, produto:0,
+    mrrServ:0, mrrBi:0, evento:0, impl:0, produto:0, projetoPersonalizado:0,
     contrato:CONTRATO_ST[0], pago:'Ag pagamento', dtPagamento:'',
     obs:''
   };
@@ -923,13 +923,14 @@ function buildLeadCard(l,i){
   body.appendChild(s6);
   var s6b=document.createElement('div'); s6b.className='grid4'; s6b.style.marginBottom='12px';
   s6b.appendChild(fieldCurr('Produto','produto',l));
+  s6b.appendChild(fieldCurr('Projeto Personalizado','projetoPersonalizado',l));
   var totalDiv=document.createElement('div');
   totalDiv.className='field';
   var totalLbl=document.createElement('label'); totalLbl.className='lbl'; totalLbl.textContent='Total combinado';
   var totalVal=document.createElement('div');
   totalVal.style.cssText='padding:8px 11px;font-size:14px;font-weight:600;color:#ff6b00;background:rgba(255,107,0,.08);border-radius:8px;border:.5px solid rgba(255,107,0,.2)';
   totalVal.id='total-lead-'+l.id;
-  totalVal.textContent=fmt(l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto);
+  totalVal.textContent=fmt(l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto+(l.projetoPersonalizado||0));
   totalDiv.appendChild(totalLbl); totalDiv.appendChild(totalVal);
   s6b.appendChild(totalDiv);
   body.appendChild(s6b);
@@ -1045,7 +1046,7 @@ function fieldCurr(lbl,campo,l){
       updateLead(lid,c,parseCurrency(el.value));
       var tot=document.getElementById('total-lead-'+lid);
       var lead=leads.find(function(x){return x.id===lid;});
-      if(tot&&lead) tot.textContent=fmt(lead.mrrServ+lead.mrrBi+lead.evento+lead.impl+lead.produto);
+      if(tot&&lead) tot.textContent=fmt(lead.mrrServ+lead.mrrBi+lead.evento+lead.impl+lead.produto+(lead.projetoPersonalizado||0));
     });
   };})(l.id,campo,inp);
   cw.appendChild(pre); cw.appendChild(inp); w.appendChild(cw); return w;
@@ -1064,7 +1065,7 @@ function makeSel(campo,opcoes,atual,lid){
 function getMetrics(){
   var m={
     total:leads.length, inicialReal:0, propostaReal:0, followReal:0,
-    vendidos:0, noshow:0, totalMrr:0, totalMrrBi:0, totalEvento:0, totalImpl:0, totalProd:0,
+    vendidos:0, noshow:0, totalMrr:0, totalMrrBi:0, totalEvento:0, totalImpl:0, totalProd:0, totalProj:0,
     vendaIndicacao:0, contratosAssin:0, pagos:0, qualp:0, qual:0, desq:0, naoprov:0,
     canais:{}, sdrs:{}
   };
@@ -1087,7 +1088,7 @@ function getMetrics(){
     if(l.status==='Vendido'){
       m.vendidos++; c.vendidos++;
       m.totalMrr+=l.mrrServ; m.totalMrrBi+=l.mrrBi;
-      m.totalEvento+=l.evento; m.totalImpl+=l.impl; m.totalProd+=l.produto;
+      m.totalEvento+=l.evento; m.totalImpl+=l.impl; m.totalProd+=l.produto; m.totalProj+=(l.projetoPersonalizado||0);
       c.mrr+=l.mrrServ; c.mrrbi+=l.mrrBi; c.impl+=l.impl;
       if(l.canal==='Indicacao') m.vendaIndicacao++;
     }
@@ -1097,7 +1098,7 @@ function getMetrics(){
       if(l.statusProposta==='Realizada') m.sdrs[l.sdr].proposta++;
     }
   });
-  m.totalCombinado=m.totalMrr+m.totalMrrBi+m.totalEvento+m.totalImpl+m.totalProd;
+  m.totalCombinado=m.totalMrr+m.totalMrrBi+m.totalEvento+m.totalImpl+m.totalProd+m.totalProj;
   m.convGeral=m.total>0?m.vendidos/m.total:0;
 
   // Ticket medio separado por tipo de servico
@@ -1122,7 +1123,7 @@ function recalc(){
 
   // nivel baseado no VALOR PAGO — calculado adiante junto com gatilhoAtingido
   var leadsPagosCalc = leads.filter(function(l){ return l.status==='Vendido' && l.pago==='Pago'; });
-  var totalPago = leadsPagosCalc.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto; }, 0);
+  var totalPago = leadsPagosCalc.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto+(l.projetoPersonalizado||0); }, 0);
 
   // Resumo funil
   setMG('resumo-funil',[
@@ -1255,27 +1256,28 @@ function recalc(){
       +'</div>';
   }
 
-  // ---- FUNCAO COMISSAO (filtro por vendido ou pago) ----
   function calcComissao(filtroLeads, nivelParam, c2ativo, valorBI){
     var totC=0;
-    var comH='<tr><th>Canal</th><th>MRR Serv</th><th>MRR BI</th><th>% MRR Serv</th><th>Comissao BI</th><th>Prod/Impl</th><th>% Prod</th><th>Total</th></tr>';
+    var comH='<tr><th>Canal</th><th>MRR Serv</th><th>MRR BI</th><th>% MRR Serv</th><th>Comissao BI</th><th>Produto</th><th>% Prod</th><th>Proj.Pers.</th><th>% Proj</th><th>Total</th></tr>';
     var comR=CANAIS.map(function(c){
       var cLeads=filtroLeads.filter(function(l){return l.canal===c;});
       var p=PARAMS.comissao[c];
       var pM=nivelParam==='abaixo'?0:(nivelParam==='ideal'?p.mrrIdeal:p.mrrMin);
       var pP=nivelParam==='abaixo'?0:(nivelParam==='ideal'?p.prodIdeal:p.prodMin);
+      var pJ=nivelParam==='abaixo'?0:(nivelParam==='ideal'?p.projIdeal:p.projMin);
 
-      // MRR Serv: sempre usa taxa do canal (Delipe One nao tem MRR Serv)
+      // MRR Serv: taxa do canal
       var mrrServ = cLeads.reduce(function(s,l){ return s + l.mrrServ; }, 0);
       var comServ = mrrServ * pM;
 
       var mrrBi=cLeads.reduce(function(s,l){return s+l.mrrBi;},0);
       var qtdBi=cLeads.filter(function(l){return l.mrrBi>0;}).length;
 
-      // Prod/Impl: Delipe One usa taxa especial (2.5% Evento/TrafegoPago, 5% outros)
+      // Produto: Delipe One usa taxa especial, demais usam taxa do canal
+      // Implantacao: soma no total mas NAO gera comissao
       var prod=0, comProd=0;
       cLeads.forEach(function(l){
-        var valProd = l.impl + l.evento + l.produto;
+        var valProd = l.evento + l.produto; // impl excluido da comissao
         prod += valProd;
         if(l.servico === 'Delipe One'){
           var taxaD1 = (c==='Evento'||c==='Trafego Pago') ? 0.025 : 0.05;
@@ -1285,28 +1287,30 @@ function recalc(){
         }
       });
 
+      // Projetos Personalizados: taxa propria
+      var proj = cLeads.reduce(function(s,l){ return s+(l.projetoPersonalizado||0); }, 0);
+      var comProj = proj * pJ;
+
       var comBi=c2ativo?(qtdBi*valorBI):(mrrBi*pM);
-      var tot=comServ+comBi+comProd;
+      var tot=comServ+comBi+comProd+comProj;
       totC+=tot;
 
       // Taxa exibida MRR Serv
       var taxaExib = mrrServ&&pM ? (pM*100).toFixed(1)+'%' : '--';
 
-      // Taxa exibida Prod: efetiva real
+      // Taxa exibida Prod
       var taxaProdExib;
-      if(!prod){
-        taxaProdExib = '--';
-      } else {
-        var qtdProdD1 = cLeads.filter(function(l){ return l.servico==='Delipe One' && (l.impl+l.evento+l.produto)>0; }).length;
-        var qtdProdTotal = cLeads.filter(function(l){ return (l.impl+l.evento+l.produto)>0; }).length;
-        if(qtdProdD1===qtdProdTotal && qtdProdD1>0){
-          taxaProdExib = ((c==='Evento'||c==='Trafego Pago')?'2,5%':'5,0%')+' (D1)';
-        } else if(qtdProdD1>0){
-          taxaProdExib = (comProd/prod*100).toFixed(1)+'%* (c/D1)';
-        } else {
-          taxaProdExib = pP?(pP*100).toFixed(1)+'%':'--';
-        }
+      if(!prod){ taxaProdExib='--'; }
+      else {
+        var qtdProdD1=cLeads.filter(function(l){return l.servico==='Delipe One'&&(l.evento+l.produto)>0;}).length;
+        var qtdProdTotal=cLeads.filter(function(l){return (l.evento+l.produto)>0;}).length;
+        if(qtdProdD1===qtdProdTotal&&qtdProdD1>0) taxaProdExib=((c==='Evento'||c==='Trafego Pago')?'2,5%':'5,0%')+' (D1)';
+        else if(qtdProdD1>0) taxaProdExib=(comProd/prod*100).toFixed(1)+'%* (c/D1)';
+        else taxaProdExib=pP?(pP*100).toFixed(1)+'%':'--';
       }
+
+      // Taxa exibida Proj Pers
+      var taxaProjExib = proj&&pJ ? (pJ*100).toFixed(1)+'%' : (proj?'--':'--');
 
       var biCell=c2ativo?(qtdBi>0?qtdBi+'x '+fmt(valorBI):'--'):(mrrBi?(pM*100).toFixed(1)+'%':'--');
       return '<tr><td>'+c+'</td>'
@@ -1316,16 +1320,18 @@ function recalc(){
         +'<td class="'+(c2ativo&&qtdBi>0?'grn':'')+'">'+(mrrBi?biCell:'--')+'</td>'
         +'<td>'+(prod?fmt(prod):'--')+'</td>'
         +'<td>'+(prod?taxaProdExib:'--')+'</td>'
+        +'<td>'+(proj?fmt(proj):'--')+'</td>'
+        +'<td>'+(proj?taxaProjExib:'--')+'</td>'
         +'<td class="ora">'+(tot?fmt(tot):'--')+'</td></tr>';
     }).join('');
-    return {html:comH+comR+'<tr><td>SUBTOTAL</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="ora">'+fmt(totC)+'</td></tr>', total:totC};
+    return {html:comH+comR+'<tr><td>SUBTOTAL</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="ora">'+fmt(totC)+'</td></tr>', total:totC};
   }
 
   // Gatilho: 70k pago para ativar comissao real
   var gatilhoAtingido = totalPago >= PARAMS.totalMin;
 
   // nivel para PROJECAO: baseado no total vendido — sempre calcula (sem gatilho)
-  var totalVendido = leadsVendidos.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto; }, 0);
+  var totalVendido = leadsVendidos.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto+(l.projetoPersonalizado||0); }, 0);
   var nivelProj = totalVendido >= PARAMS.totalIdeal ? 'ideal' : 'min'; // sempre min ou ideal, nunca abaixo
   // nivel para REAL: baseado no total pago (gatilho 70k)
   var nivel = gatilhoAtingido ? (totalPago >= PARAMS.totalIdeal ? 'ideal' : 'min') : 'abaixo';
@@ -1561,7 +1567,7 @@ async function adminVerConsolidado(){
       if(!porCloser[l._closer]) porCloser[l._closer]={vendas:0,mrr:0,mrrbi:0,comb:0};
       if(l.status==='Vendido'){
         totalVendas++; totalMrr+=l.mrrServ; totalMrrBi+=l.mrrBi;
-        var comb=l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto;
+        var comb=l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto+(l.projetoPersonalizado||0);
         totalComb+=comb;
         porCloser[l._closer].vendas++;
         porCloser[l._closer].mrr+=l.mrrServ;
@@ -1789,7 +1795,7 @@ function recalcSdr(){
   var reunQualif     = sdrLeads.filter(function(l){ return l.statusInicial==='Realizada' && l.qualificacao==='Qualificado+' || l.qualificacao==='Qualificado'; }).length;
   var reunNaoQualif  = reunReal - reunQualif;
   var vendidos       = sdrLeads.filter(function(l){ return l.status==='Vendido'; });
-  var totalVendido   = vendidos.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto; }, 0);
+  var totalVendido   = vendidos.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto+(l.projetoPersonalizado||0); }, 0);
   var totalMrr       = vendidos.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi; }, 0);
 
   // Resumo
@@ -2602,7 +2608,7 @@ async function adminVerConsolidado(){
       if(!porCloser[l._closer]) porCloser[l._closer]={vendas:0,mrr:0,mrrbi:0,comb:0};
       if(l.status==='Vendido'){
         totalVendas++; totalMrr+=l.mrrServ; totalMrrBi+=l.mrrBi;
-        var comb=l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto;
+        var comb=l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto+(l.projetoPersonalizado||0);
         totalComb+=comb;
         porCloser[l._closer].vendas++;
         porCloser[l._closer].mrr+=l.mrrServ;
