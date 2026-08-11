@@ -180,6 +180,9 @@ textarea{resize:vertical;min-height:60px}
 .export-btn:hover{opacity:.88}
 .export-btn svg{width:16px;height:16px}
 footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255,255,.2)}
+.btn-excluir-user{background:rgba(227,73,72,.12);border:.5px solid rgba(227,73,72,.3);color:#e34948;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:14px;font-family:'Inter',sans-serif;line-height:1;transition:all .15s;margin-left:6px}
+.btn-excluir-user:hover:not(:disabled){background:rgba(227,73,72,.28);border-color:rgba(227,73,72,.6)}
+.btn-excluir-user:disabled{opacity:.3;cursor:not-allowed}
 
 @media(max-width:700px){.grid2,.grid3,.grid4{grid-template-columns:1fr}.tabs{flex-wrap:wrap}}
 
@@ -1881,6 +1884,19 @@ async function carregarUsuarios(){
       sel.onchange=(function(email,nome){return function(){
         salvarPerfil(email,nome,this.value);
       };})(u.email,u.nome);
+      // Nao permitir excluir o proprio usuario logado
+      var isMe = currentUser && currentUser.email === u.email;
+      var btnExcluir = document.createElement('button');
+      btnExcluir.className = 'btn-excluir-user';
+      btnExcluir.title = isMe ? 'Voce nao pode excluir sua propria conta' : 'Excluir usuario';
+      btnExcluir.innerHTML = '&#128465;';
+      btnExcluir.disabled = isMe;
+      if(!isMe){
+        btnExcluir.onclick = (function(email,nome){return function(){
+          excluirUsuario(email,nome);
+        };})(u.email, u.nome);
+      }
+
       div.innerHTML='<div class="user-item-info">'
         +'<div class="user-item-avatar">'+((u.nome||u.email).charAt(0).toUpperCase())+'</div>'
         +'<div><div class="user-item-name">'+(u.nome||u.email)+'</div>'
@@ -1890,6 +1906,7 @@ async function carregarUsuarios(){
         +'<span class="'+badgeCls+'">'+badgeTxt+'</span>'
         +'</div>';
       div.querySelector('.user-item-actions').appendChild(sel);
+      div.querySelector('.user-item-actions').appendChild(btnExcluir);
       ul.appendChild(div);
     });
   } catch(e){ console.error(e); ul.innerHTML='<div style="color:#e34948;font-size:13px;padding:1rem">Erro ao carregar usuarios.</div>'; }
@@ -1907,6 +1924,27 @@ async function salvarPerfil(email, nome, perfil){
     if(fb2){fb2.style.display='block';fb2.style.color='#1baf7a';fb2.textContent='Perfil de '+nome+' atualizado para '+perfil+'!';}
     setTimeout(function(){if(fb2)fb2.style.display='none';},3000);
   } catch(e){ console.error(e); }
+}
+
+async function excluirUsuario(email, nome){
+  var confirmar = window.confirm('Excluir o usuario "' + (nome||email) + '" (' + email + ')?\n\nEle perdera acesso imediatamente.');
+  if(!confirmar) return;
+  var fb2 = document.getElementById('invite-feedback');
+  if(!window._fb){
+    if(fb2){fb2.style.display='block';fb2.style.color='#e34948';fb2.textContent='Firebase nao conectado.';}
+    return;
+  }
+  try {
+    var fb = window._fb;
+    var emailKey = email.replace(/[^a-zA-Z0-9]/g,'_');
+    await fb.deleteDoc(fb.doc(fb.db,'usuarios',emailKey));
+    if(fb2){fb2.style.display='block';fb2.style.color='#1baf7a';fb2.textContent='Usuario '+( nome||email)+' excluido com sucesso.';}
+    setTimeout(function(){if(fb2)fb2.style.display='none';},4000);
+    await carregarUsuarios();
+  } catch(e){
+    console.error('Erro excluir usuario:', e);
+    if(fb2){fb2.style.display='block';fb2.style.color='#e34948';fb2.textContent='Erro ao excluir: '+e.message;}
+  }
 }
 
 async function convidarUsuario(){
