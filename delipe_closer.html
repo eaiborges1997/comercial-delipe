@@ -2599,6 +2599,7 @@ async function carregarTrimestre(){
 
     var totalLeads=0, totalVendidos=0, totalIniciais=0, totalPropostas=0, totalNoShow=0;
     var totalMrr=0, totalMrrBi=0, totalProd=0, totalImpl=0, totalProj=0, totalComb=0;
+    var totalMrrPago=0, totalMrrBiPago=0, totalProdPago=0, totalImplPago=0, totalProjPago=0, totalCombPago=0;
     var totalRecorrencias=0, totalBis=0;
     var empresasUnicas={};
 
@@ -2620,10 +2621,19 @@ async function carregarTrimestre(){
           var cnpjLimpo=l.cnpj?l.cnpj.replace(/\D/g,''):'';
           var key=cnpjLimpo.length>=14?'cnpj_'+cnpjLimpo:'nome_'+(l.empresa||'').toLowerCase().trim();
           if(key&&key!=='nome_') empresasUnicas[key]=true;
+          // Acumular pago
+          if(l.pago==='Pago'){
+            totalMrrPago+=l.mrrServ||0;
+            totalMrrBiPago+=l.mrrBi||0;
+            totalProdPago+=l.produto||0;
+            totalImplPago+=l.impl||0;
+            totalProjPago+=l.projetoPersonalizado||0;
+          }
         }
       });
     });
-    totalComb = totalMrr+totalMrrBi+totalProd+totalImpl+totalProj;
+    totalComb     = totalMrr+totalMrrBi+totalProd+totalImpl+totalProj;
+    totalCombPago = totalMrrPago+totalMrrBiPago+totalProdPago+totalImplPago+totalProjPago;
 
     var rs = document.getElementById('tri-resumo');
     if(rs){
@@ -2641,7 +2651,8 @@ async function carregarTrimestre(){
         mc('Produto acumulado',fmt(totalProd),'','orange'),
         mc('Implantacao acumulada',fmt(totalImpl),'nao comissiona',''),
         mc('Proj. Personalizado',fmt(totalProj),'','orange'),
-        mc('Total Combinado',fmt(totalComb),'trimestre','orange')
+        mc('Total Combinado Vendido',fmt(totalComb),'todos vendidos','orange'),
+        mc('Total Combinado Pago',fmt(totalCombPago),'status = Pago','green')
       ].join('');
     }
 
@@ -2656,6 +2667,8 @@ async function carregarTrimestre(){
         var projM  = v.reduce(function(s,l){return s+(l.projetoPersonalizado||0);},0);
         var implM  = v.reduce(function(s,l){return s+(l.impl||0);},0);
         var combM  = mrrM+mrrBiM+prodM+evM+projM+implM;
+        var vPago  = v.filter(function(l){return l.pago==='Pago';});
+        var combPagoM = vPago.reduce(function(s,l){return s+(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.projetoPersonalizado||0)+(l.impl||0);},0);
         return '<div style="padding:14px 0;border-bottom:.5px solid rgba(255,255,255,.07)">'
           +'<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:10px">'+d.mes+'</div>'
           +'<div style="display:flex;flex-wrap:wrap;gap:12px 24px;font-size:12px">'
@@ -2667,7 +2680,8 @@ async function carregarTrimestre(){
           +(evM?'<span style="color:rgba(255,255,255,.5)">Evento: <strong style="color:#ff6b00">'+fmt(evM)+'</strong></span>':'')
           +(projM?'<span style="color:rgba(255,255,255,.5)">Proj. Personalizado: <strong style="color:#ff6b00">'+fmt(projM)+'</strong></span>':'')
           +(implM?'<span style="color:rgba(255,255,255,.5)">Implantacao: <strong style="color:rgba(255,255,255,.4)">'+fmt(implM)+'</strong></span>':'')
-          +'<span style="color:rgba(255,255,255,.5)">Total Combinado: <strong style="color:#ff6b00">'+fmt(combM)+'</strong></span>'
+          +'<span style="color:rgba(255,255,255,.5)">Total Combinado Vendido: <strong style="color:#ff6b00">'+fmt(combM)+'</strong></span>'
+          +'<span style="color:rgba(255,255,255,.5)">Total Combinado Pago: <strong style="color:#1baf7a">'+fmt(combPagoM)+'</strong></span>'
           +'</div></div>';
       }).join('');
     }
