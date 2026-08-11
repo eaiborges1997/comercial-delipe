@@ -1104,10 +1104,32 @@ function fieldDate(lbl,campo,l){
   w.appendChild(inp); return w;
 }
 function fieldDateTime(lbl,campo,l){
-  var w=fieldWrap(lbl);
-  var inp=document.createElement('input'); inp.type='datetime-local'; inp.value=l[campo]||'';
-  inp.onchange=(function(lid,c){return function(){updateLead(lid,c,this.value);};})(l.id,campo);
-  w.appendChild(inp); return w;
+  var w=document.createElement('div'); w.className='field';
+  var label=document.createElement('label'); label.className='lbl'; label.textContent=lbl;
+  w.appendChild(label);
+  // Separar data e hora do valor salvo (formato: "2026-07-01T14:30" ou "2026-07-01")
+  var valSalvo = l[campo]||'';
+  var partes = valSalvo.split('T');
+  var dataVal = partes[0]||'';
+  var horaVal = partes[1]||'';
+
+  var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px';
+
+  var inpData=document.createElement('input'); inpData.type='date'; inpData.value=dataVal;
+  inpData.style.cssText='flex:1';
+  var inpHora=document.createElement('input'); inpHora.type='time'; inpHora.value=horaVal;
+  inpHora.style.cssText='width:100px';
+
+  function salvar(){
+    var d=inpData.value; var h=inpHora.value;
+    var val = d ? (h ? d+'T'+h : d) : '';
+    updateLead(l.id, campo, val);
+  }
+  inpData.onchange=salvar;
+  inpHora.onchange=salvar;
+
+  row.appendChild(inpData); row.appendChild(inpHora);
+  w.appendChild(row); return w;
 }
 function fieldSelect(lbl,campo,opcoes,l){
   var w=fieldWrap(lbl);
