@@ -2598,8 +2598,8 @@ async function carregarTrimestre(){
     }
 
     var totalLeads=0, totalVendidos=0, totalIniciais=0, totalPropostas=0, totalNoShow=0;
-    var totalMrr=0, totalMrrBi=0, totalProd=0, totalImpl=0, totalProj=0, totalComb=0;
-    var totalMrrPago=0, totalMrrBiPago=0, totalProdPago=0, totalImplPago=0, totalProjPago=0, totalCombPago=0;
+    var totalMrr=0, totalMrrBi=0, totalProd=0, totalImpl=0, totalProj=0, totalEv=0, totalComb=0;
+    var totalMrrPago=0, totalMrrBiPago=0, totalProdPago=0, totalImplPago=0, totalProjPago=0, totalEvPago=0, totalCombPago=0;
     var totalRecorrencias=0, totalBis=0;
     var empresasUnicas={};
 
@@ -2616,6 +2616,7 @@ async function carregarTrimestre(){
           totalProd+=l.produto||0;
           totalImpl+=l.impl||0;
           totalProj+=l.projetoPersonalizado||0;
+          totalEv+=(l.evento||0);
           if(l.mrrServ>0) totalRecorrencias++;
           if(l.mrrBi>0) totalBis++;
           var cnpjLimpo=l.cnpj?l.cnpj.replace(/\D/g,''):'';
@@ -2628,12 +2629,13 @@ async function carregarTrimestre(){
             totalProdPago+=l.produto||0;
             totalImplPago+=l.impl||0;
             totalProjPago+=l.projetoPersonalizado||0;
+            totalEvPago+=l.evento||0;
           }
         }
       });
     });
-    totalComb     = totalMrr+totalMrrBi+totalProd+totalImpl+totalProj;
-    totalCombPago = totalMrrPago+totalMrrBiPago+totalProdPago+totalImplPago+totalProjPago;
+    totalComb     = totalMrr+totalMrrBi+totalProd+totalImpl+totalProj+totalEv;
+    totalCombPago = totalMrrPago+totalMrrBiPago+totalProdPago+totalImplPago+totalProjPago+totalEvPago;
 
     var rs = document.getElementById('tri-resumo');
     if(rs){
@@ -2649,6 +2651,7 @@ async function carregarTrimestre(){
         mc('MRR Serv acumulado',fmt(totalMrr),'recorrencia','green'),
         mc('MRR BI acumulado',fmt(totalMrrBi),'recorrencia','blue'),
         mc('Produto acumulado',fmt(totalProd),'','orange'),
+        mc('Evento acumulado',fmt(totalEv),'','orange'),
         mc('Implantacao acumulada',fmt(totalImpl),'nao comissiona',''),
         mc('Proj. Personalizado',fmt(totalProj),'','orange'),
         mc('Total Combinado Vendido',fmt(totalComb),'todos vendidos','orange'),
