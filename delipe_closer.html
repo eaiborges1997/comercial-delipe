@@ -387,12 +387,12 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
     <div class="mes-nav" id="mes-nav" style="display:flex">
       <select id="mes-hist" onchange="carregarMesFirestore()">
         <option>Janeiro</option><option>Fevereiro</option><option>Marco</option>
-        <option>Abril</option><option>Maio</option><option selected>Junho</option>
+        <option>Abril</option><option>Maio</option><option>Junho</option>
         <option>Julho</option><option>Agosto</option><option>Setembro</option>
         <option>Outubro</option><option>Novembro</option><option>Dezembro</option>
       </select>
       <select id="ano-hist" onchange="carregarMesFirestore()">
-        <option>2024</option><option selected>2025</option><option>2026</option>
+        <option>2024</option><option>2025</option><option>2026</option>
       </select>
       <button onclick="carregarMesFirestore()">Carregar</button>
     </div>
@@ -448,7 +448,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
       <div class="field"><label class="lbl">Mes</label>
         <select id="mes-ref">
           <option>Janeiro</option><option>Fevereiro</option><option>Marco</option>
-          <option>Abril</option><option>Maio</option><option selected>Junho</option>
+          <option>Abril</option><option>Maio</option><option>Junho</option>
           <option>Julho</option><option>Agosto</option><option>Setembro</option>
           <option>Outubro</option><option>Novembro</option><option>Dezembro</option>
         </select></div>
@@ -1504,15 +1504,24 @@ function showTabSdr(t){
 }
 
 function getSdrLeads(){
-  var nome = window._sdrNome || '';
-  return leads.filter(function(l){ return l.sdr && l.sdr.toUpperCase()===nome.toUpperCase(); });
+  var nome = (window._sdrNome || '').toUpperCase().trim();
+  if(!nome) return [];
+  return leads.filter(function(l){
+    return l.sdr && l.sdr.toUpperCase().trim() === nome;
+  });
 }
 
 function addSdrLead(){
   var nl = newLead();
-  var sdrNome = (window._sdrNome || '').toUpperCase();
-  if(sdrNome && SDRS.indexOf(sdrNome) >= 0) nl.sdr = sdrNome;
-  nl._deSdr = true; // marca como originado pelo SDR
+  // Preencher SDR com o nome do SDR logado
+  var sdrNome = (window._sdrNome || '').toUpperCase().trim();
+  if(sdrNome){
+    // Usar o valor exato que está em SDRS se existir, senão usar o nome diretamente
+    var idx = SDRS.findIndex(function(s){ return s.toUpperCase() === sdrNome; });
+    nl.sdr = idx >= 0 ? SDRS[idx] : sdrNome;
+  }
+  nl._deSdr = true;
+  nl._sdrNome = sdrNome;
   leads.push(nl);
   agendarSalvamento();
   recalcSdr();
@@ -1788,6 +1797,41 @@ function exportarPDF(){
   setTimeout(function(){document.querySelectorAll('.rm-lead-btn,.add-lead-btn').forEach(function(b){b.style.visibility='';});},600);
 }
 
+// Definir mes e ano atual automaticamente
+(function(){
+  var MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho',
+               'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var agora = new Date();
+  var mesAtual = MESES[agora.getMonth()];
+  var anoAtual = String(agora.getFullYear());
+
+  function setSelect(id, val){
+    var el = document.getElementById(id);
+    if(!el) return;
+    for(var i=0; i<el.options.length; i++){
+      el.options[i].selected = (el.options[i].text === val || el.options[i].value === val);
+    }
+    // Adicionar ano se nao existir
+    if(el.tagName === 'SELECT' && id.indexOf('ano') >= 0){
+      var found = false;
+      for(var j=0; j<el.options.length; j++){
+        if(el.options[j].text === val){ found=true; break; }
+      }
+      if(!found){
+        var opt = document.createElement('option');
+        opt.text = val; opt.value = val; opt.selected = true;
+        el.appendChild(opt);
+      }
+    }
+  }
+
+  setSelect('mes-hist', mesAtual);
+  setSelect('ano-hist', anoAtual);
+  setSelect('mes-ref',  mesAtual);
+  var ar = document.getElementById('ano-ref');
+  if(ar) ar.value = anoAtual;
+})();
+
 renderConfig();
 renderLeads();
 
@@ -1840,9 +1884,12 @@ function mostrarApp(user){
     document.getElementById('tabs-sdr').style.display='flex';
     esconderAbasCloser();
     mostrarAbasSdr();
-    window._sdrNome = SDR_EMAILS[user.email] || nome.toUpperCase();
+    // _sdrNome: usar mapeamento de email, ou primeiro nome do displayName, ou primeiro trecho do email
+    var primeiroNome = nome.toUpperCase().split(' ')[0];
+    window._sdrNome = SDR_EMAILS[user.email] || primeiroNome;
     recalcSdr();
-    setTimeout(iniciarListenerSdr, 1000); // iniciar listener em tempo real
+    setTimeout(carregarDadosIniciais, 300);
+    setTimeout(iniciarListenerSdr, 1200);
   } else {
     document.getElementById('admin-bar').classList.remove('visible');
     document.getElementById('admin-only-config').classList.remove('visible');
@@ -2249,12 +2296,16 @@ async function carregarDoFirestore(chave){
     } else {
       leads = [];
     }
-    renderLeads();
+    if(window._isSdr){
+      recalcSdr();
+    } else {
+      renderLeads();
+    }
     setSyncStatus('connected', leads.length + ' leads carregados');
   } catch(e){
     console.error('Erro ao carregar:', e);
     leads = [];
-    renderLeads();
+    if(window._isSdr){ recalcSdr(); } else { renderLeads(); }
     setSyncStatus('connected','Erro ao carregar');
   }
 }
