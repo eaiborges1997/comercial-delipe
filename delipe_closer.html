@@ -435,6 +435,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   <button class="tab active" onclick="showTab('funil')">Funil de Leads</button>
   <button class="tab" onclick="showTab('metricas')">Metricas</button>
   <button class="tab" onclick="showTab('comissao')">Comissao</button>
+  <button class="tab" onclick="showTab('trimestre');carregarTrimestre()">Trimestre</button>
   <button class="tab" onclick="showTab('config')">Config</button>
 </div>
 <div class="tabs" id="tabs-sdr" style="display:none">
@@ -524,6 +525,37 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 </div>
 
 <!-- ===== CONFIG ===== -->
+<div id="tab-trimestre" class="tab-content">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="sec">Acumulado do Trimestre</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:2px">Soma dos 3 meses do trimestre atual</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <select id="tri-select" style="padding:7px 12px;font-size:13px;border:.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif">
+          <option value="Q1">Q1 — Jan/Fev/Mar</option>
+          <option value="Q2">Q2 — Abr/Mai/Jun</option>
+          <option value="Q3">Q3 — Jul/Ago/Set</option>
+          <option value="Q4">Q4 — Out/Nov/Dez</option>
+        </select>
+        <select id="tri-ano" style="padding:7px 12px;font-size:13px;border:.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif">
+          <option>2024</option><option>2025</option><option>2026</option><option>2027</option>
+        </select>
+        <button onclick="carregarTrimestre()" style="padding:7px 16px;font-size:13px;font-weight:600;background:#ff6b00;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Inter,sans-serif">Carregar</button>
+      </div>
+    </div>
+  </div>
+  <div id="tri-loading" style="display:none;text-align:center;padding:2rem;font-size:13px;color:rgba(255,255,255,.35)">Carregando dados do trimestre...</div>
+  <div id="tri-conteudo" style="display:none">
+    <div class="metric-grid" id="tri-resumo"></div>
+    <div class="card" style="margin-top:0">
+      <div class="sec">Detalhamento por Mes</div>
+      <div id="tri-meses"></div>
+    </div>
+  </div>
+</div>
+
 <div id="tab-config" class="tab-content">
   <div class="card" style="padding:0">
     <details>
@@ -2007,6 +2039,13 @@ function exportarPDF(){
     }
   }
 
+  // Selecionar trimestre atual automaticamente
+  var triAtual = agora.getMonth() < 3 ? 'Q1' : agora.getMonth() < 6 ? 'Q2' : agora.getMonth() < 9 ? 'Q3' : 'Q4';
+  var triSel = document.getElementById('tri-select');
+  if(triSel) triSel.value = triAtual;
+  var triAno = document.getElementById('tri-ano');
+  if(triAno) triAno.value = anoAtual;
+
   setSelect('mes-hist', mesAtual);
   setSelect('ano-hist', anoAtual);
   setSelect('mes-ref',  mesAtual);
@@ -2496,6 +2535,114 @@ async function salvarNoFirestore(){
     setSyncStatus('connected','Erro ao salvar — tente novamente');
   }
   isSaving = false;
+}
+
+
+// ==================== TRIMESTRE ====================
+var TRI_MESES = {
+  Q1:['Janeiro','Fevereiro','Marco'],
+  Q2:['Abril','Maio','Junho'],
+  Q3:['Julho','Agosto','Setembro'],
+  Q4:['Outubro','Novembro','Dezembro']
+};
+
+async function carregarTrimestre(){
+  if(!window._fb || !currentUser) return;
+  var tri = document.getElementById('tri-select').value;
+  var ano = document.getElementById('tri-ano').value;
+  var meses = TRI_MESES[tri];
+  document.getElementById('tri-loading').style.display='block';
+  document.getElementById('tri-conteudo').style.display='none';
+
+  try {
+    var fb = window._fb;
+    var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+    if(window._viewingEmail) emailKey = window._viewingEmail.replace(/[^a-zA-Z0-9]/g,'_');
+
+    var dadosMeses = [];
+    for(var i=0; i<meses.length; i++){
+      var chave = emailKey+'__'+meses[i]+'_'+ano;
+      try {
+        var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
+        var leadsDoMes = (snap.exists() && snap.data().leads) ? snap.data().leads : [];
+        dadosMeses.push({mes:meses[i], leads:leadsDoMes});
+      } catch(e){ dadosMeses.push({mes:meses[i], leads:[]}); }
+    }
+
+    var totalLeads=0, totalVendidos=0, totalIniciais=0, totalPropostas=0, totalNoShow=0;
+    var totalMrr=0, totalMrrBi=0, totalProd=0, totalImpl=0, totalProj=0, totalComb=0;
+    var totalRecorrencias=0, totalBis=0;
+    var empresasUnicas={};
+
+    dadosMeses.forEach(function(d){
+      d.leads.forEach(function(l){
+        totalLeads++;
+        if(l.statusInicial==='Realizada'||l.statusInicial==='Venda em ligacao') totalIniciais++;
+        if(l.statusProposta==='Realizada'||l.statusProposta==='Venda em ligacao') totalPropostas++;
+        if(l.statusInicial==='No-show'||l.statusProposta==='No-show') totalNoShow++;
+        if(l.status==='Vendido'){
+          totalVendidos++;
+          totalMrr+=l.mrrServ||0;
+          totalMrrBi+=l.mrrBi||0;
+          totalProd+=l.produto||0;
+          totalImpl+=l.impl||0;
+          totalProj+=l.projetoPersonalizado||0;
+          if(l.mrrServ>0) totalRecorrencias++;
+          if(l.mrrBi>0) totalBis++;
+          var cnpjLimpo=l.cnpj?l.cnpj.replace(/\D/g,''):'';
+          var key=cnpjLimpo.length>=14?'cnpj_'+cnpjLimpo:'nome_'+(l.empresa||'').toLowerCase().trim();
+          if(key&&key!=='nome_') empresasUnicas[key]=true;
+        }
+      });
+    });
+    totalComb = totalMrr+totalMrrBi+totalProd+totalImpl+totalProj;
+
+    var rs = document.getElementById('tri-resumo');
+    if(rs){
+      rs.innerHTML = [
+        mc('Total Leads',totalLeads,'no trimestre',''),
+        mc('Iniciais Realizadas',totalIniciais,'',''),
+        mc('Propostas Realizadas',totalPropostas,'','orange'),
+        mc('Vendidos',totalVendidos,'','green'),
+        mc('No-shows',totalNoShow,'','amber'),
+        mc('Recorrencias vendidas',totalRecorrencias,'MRR Serv','green'),
+        mc('BIs vendidos',totalBis,'MRR BI','blue'),
+        mc('Empresas unicas',Object.keys(empresasUnicas).length,'por CNPJ','blue'),
+        mc('MRR Serv acumulado',fmt(totalMrr),'recorrencia','green'),
+        mc('MRR BI acumulado',fmt(totalMrrBi),'recorrencia','blue'),
+        mc('Produto acumulado',fmt(totalProd),'','orange'),
+        mc('Implantacao acumulada',fmt(totalImpl),'nao comissiona',''),
+        mc('Proj. Personalizado',fmt(totalProj),'','orange'),
+        mc('Total Combinado',fmt(totalComb),'trimestre','orange')
+      ].join('');
+    }
+
+    var tm = document.getElementById('tri-meses');
+    if(tm){
+      tm.innerHTML = dadosMeses.map(function(d){
+        var v=d.leads.filter(function(l){return l.status==='Vendido';});
+        var mrrM=v.reduce(function(s,l){return s+(l.mrrServ||0);},0);
+        var mrrBiM=v.reduce(function(s,l){return s+(l.mrrBi||0);},0);
+        var combM=v.reduce(function(s,l){return s+(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.projetoPersonalizado||0)+(l.impl||0);},0);
+        return '<div style="padding:12px 0;border-bottom:.5px solid rgba(255,255,255,.07)">'
+          +'<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:8px">'+d.mes+'</div>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:rgba(255,255,255,.5)">'
+          +'<span>Leads: <strong style="color:#fff">'+d.leads.length+'</strong></span>'
+          +'<span>Vendidos: <strong style="color:#ff6b00">'+v.length+'</strong></span>'
+          +'<span>MRR Serv: <strong style="color:#1baf7a">'+fmt(mrrM)+'</strong></span>'
+          +'<span>MRR BI: <strong style="color:#2a78d6">'+fmt(mrrBiM)+'</strong></span>'
+          +'<span>Total Combinado: <strong style="color:#ff6b00">'+fmt(combM)+'</strong></span>'
+          +'</div></div>';
+      }).join('');
+    }
+
+    document.getElementById('tri-loading').style.display='none';
+    document.getElementById('tri-conteudo').style.display='block';
+  } catch(e){
+    console.error('Erro trimestre:',e);
+    document.getElementById('tri-loading').textContent='Erro ao carregar dados.';
+    document.getElementById('tri-loading').style.display='block';
+  }
 }
 
 async function carregarDoFirestore(chave){
