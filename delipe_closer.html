@@ -1569,6 +1569,37 @@ function addServico(){ var n=prompt('Nome do servico:'); if(n&&n.trim()){SERVICO
 function addCargo(){ var n=prompt('Nome do cargo:'); if(n&&n.trim()){CARGOS.push(n.trim());renderConfig();} }
 
 // Migracao de leads: move leads especificos de agosto para julho
+
+async function calcularJulho(){
+  if(!window._fb||!currentUser){alert('Firebase nao conectado');return;}
+  var fb=window._fb;
+  var snap=await fb.getDoc(fb.doc(fb.db,'leads','lucas_delipe_com__Julho_2026'));
+  if(!snap.exists()){document.getElementById('resultado-julho').textContent='Documento nao encontrado';return;}
+  var ls=snap.data().leads||[];
+  var v=ls.filter(function(l){return l.status==='Vendido';});
+  var tmrr=0,tbi=0,tprod=0,timpl=0,tev=0,tproj=0;
+  var linhas=[];
+  v.forEach(function(l){
+    tmrr+=l.mrrServ||0;tbi+=l.mrrBi||0;tprod+=l.produto||0;
+    timpl+=l.impl||0;tev+=l.evento||0;tproj+=l.projetoPersonalizado||0;
+    var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.impl||0)+(l.evento||0)+(l.projetoPersonalizado||0);
+    linhas.push((l.empresa||'?')+' | '+l.canal+' | Total: '+fmt(comb)+' | '+l.pago);
+  });
+  var tot=tmrr+tbi+tprod+timpl+tev+tproj;
+  var txt='Total leads: '+ls.length+' | Vendidos: '+v.length+'\n\n';
+  txt+=linhas.join('\n');
+  txt+='\n\n────────────────────────────────\n';
+  txt+='MRR Serv:         '+fmt(tmrr)+'\n';
+  txt+='MRR BI:           '+fmt(tbi)+'\n';
+  txt+='Produto:          '+fmt(tprod)+'\n';
+  txt+='Evento:           '+fmt(tev)+'\n';
+  txt+='Implantacao:      '+fmt(timpl)+'\n';
+  txt+='Proj Personaliz:  '+fmt(tproj)+'\n';
+  txt+='────────────────────────────────\n';
+  txt+='TOTAL COMBINADO:  '+fmt(tot);
+  document.getElementById('resultado-julho').textContent=txt;
+}
+
 async function migrarLeadsParaJulho(){
   if(!window._fb || !currentUser) { alert('Firebase nao conectado.'); return; }
   var confirmar = confirm(
