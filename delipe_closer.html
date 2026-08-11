@@ -1665,7 +1665,6 @@ function mostrarApp(user){
       document.getElementById('nome-closer').value = nome;
       atualizarNome();
     }
-    setTimeout(carregarUsuarios, 300);
     setTimeout(carregarDadosIniciais, 500);
   } else if(isSdr){
     document.getElementById('admin-bar').classList.remove('visible');
@@ -1836,6 +1835,10 @@ function iniciarFirebaseAuth(){
         if(snap.exists()) user._perfil = snap.data().perfil||'closer';
         else user._perfil = SDR_EMAILS[user.email]?'sdr':(fb2.ADMINS.indexOf(user.email)>=0?'admin':'closer');
         mostrarAppComPerfil(user);
+        // Carregar lista de usuarios se for admin (apos mostrarApp definir isAdmin=true)
+        if(user._perfil==='admin' || fb2.ADMINS.indexOf(user.email)>=0){
+          setTimeout(function(){ carregarUsuarios(true); }, 400);
+        }
       }).catch(function(){ mostrarApp(user); });
     } else {
       esconderApp();
@@ -1846,12 +1849,12 @@ function iniciarFirebaseAuth(){
 // Cache local de perfis
 var PERFIS_CACHE = {};
 
-async function carregarUsuarios(){
-  if(!isAdmin) return;
+async function carregarUsuarios(forceLoad){
+  if(!isAdmin && !forceLoad) return;
   var ul = document.getElementById('users-list');
   if(!ul) return;
   if(!window._fb){
-    setTimeout(carregarUsuarios, 800);
+    setTimeout(function(){ carregarUsuarios(forceLoad); }, 600);
     return;
   }
   ul.innerHTML = '<div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1rem">Carregando...</div>';
