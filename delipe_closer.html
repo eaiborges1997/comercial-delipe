@@ -930,7 +930,7 @@ function buildLeadCard(l,i){
   var saveBtn=document.createElement('button');
   saveBtn.className='save-lead-btn';
   saveBtn.innerHTML='&#128190; Salvar lead';
-  saveBtn.onclick=(function(lid, btn){
+  saveBtn.onclick=(function(lid, btn, crd){
     return function(){
       btn.disabled=true;
       btn.textContent='Salvando...';
@@ -939,13 +939,15 @@ function buildLeadCard(l,i){
         btn.className='save-lead-btn saved';
         btn.innerHTML='&#10003; Salvo!';
         setTimeout(function(){
+          // Recolher o card
+          crd.classList.remove('open');
           btn.className='save-lead-btn';
           btn.innerHTML='&#128190; Salvar lead';
           btn.disabled=false;
-        }, 2000);
-      }, 900);
+        }, 800);
+      }, 700);
     };
-  })(l.id, saveBtn);
+  })(l.id, saveBtn, card);
   saveBar.appendChild(saveBtn);
   body.appendChild(saveBar);
 
