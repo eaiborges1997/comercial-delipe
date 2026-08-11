@@ -1665,6 +1665,8 @@ function mostrarApp(user){
       document.getElementById('nome-closer').value = nome;
       atualizarNome();
     }
+    setTimeout(carregarUsuarios, 300);
+    setTimeout(carregarDadosIniciais, 500);
   } else if(isSdr){
     document.getElementById('admin-bar').classList.remove('visible');
     document.getElementById('admin-only-config').classList.remove('visible');
@@ -1884,19 +1886,7 @@ async function carregarUsuarios(){
       sel.onchange=(function(email,nome){return function(){
         salvarPerfil(email,nome,this.value);
       };})(u.email,u.nome);
-      // Nao permitir excluir o proprio usuario logado
-      var isMe = currentUser && currentUser.email === u.email;
-      var btnExcluir = document.createElement('button');
-      btnExcluir.className = 'btn-excluir-user';
-      btnExcluir.title = isMe ? 'Voce nao pode excluir sua propria conta' : 'Excluir usuario';
-      btnExcluir.innerHTML = '&#128465;';
-      btnExcluir.disabled = isMe;
-      if(!isMe){
-        btnExcluir.onclick = (function(email,nome){return function(){
-          excluirUsuario(email,nome);
-        };})(u.email, u.nome);
-      }
-
+      // Montar HTML base primeiro
       div.innerHTML='<div class="user-item-info">'
         +'<div class="user-item-avatar">'+((u.nome||u.email).charAt(0).toUpperCase())+'</div>'
         +'<div><div class="user-item-name">'+(u.nome||u.email)+'</div>'
@@ -1905,7 +1895,20 @@ async function carregarUsuarios(){
         +'<div class="user-item-actions">'
         +'<span class="'+badgeCls+'">'+badgeTxt+'</span>'
         +'</div>';
+      // Adicionar select de perfil via JS (preserva event listeners)
       div.querySelector('.user-item-actions').appendChild(sel);
+      // Botao excluir — nao pode excluir o proprio usuario
+      var isMe = currentUser && currentUser.email === u.email;
+      var btnExcluir = document.createElement('button');
+      btnExcluir.className = 'btn-excluir-user';
+      btnExcluir.title = isMe ? 'Voce nao pode excluir sua propria conta' : 'Excluir usuario';
+      btnExcluir.innerHTML = '&#128465;';
+      btnExcluir.disabled = isMe;
+      if(!isMe){
+        btnExcluir.onclick = (function(em,nm){return function(){
+          excluirUsuario(em,nm);
+        };})(u.email, u.nome);
+      }
       div.querySelector('.user-item-actions').appendChild(btnExcluir);
       ul.appendChild(div);
     });
