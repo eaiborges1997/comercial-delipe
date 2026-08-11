@@ -1298,41 +1298,49 @@ function recalc(){
   if(tpj) tpj.innerHTML = resProj.html;
   if(trl) trl.innerHTML = resReal.html;
 
-  // Totais com campanhas
-  var bonusProjTotal = c1bonus + c2bonus;
-  var bonusRealTotal = (qtdMrrPago>=6?2000:0) + c2bonusPago;
+  // Totais com campanhas — so existem se atingiu 70k pago
+  var gatilhoAtingido = totalPago >= PARAMS.totalMin;
+  var bonusProjTotal = gatilhoAtingido ? (c1bonus + c2bonus) : 0;
+  var bonusRealTotal = gatilhoAtingido ? ((qtdMrrPago>=6?2000:0) + c2bonusPago) : 0;
 
-  // Bonus qualitativos (calculado antes dos totais para somar tudo)
+  // Bonus qualitativos — so existem se atingiu 70k pago
   var br=document.getElementById('bonus-rows'); var totB=0;
   if(br){
     var bItems=[
-      {label:PARAMS.bonus.conversao.label,atingido:m.convGeral>=0.4,val:PARAMS.bonus.conversao.val},
-      {label:PARAMS.bonus.indicacao.label,atingido:m.vendaIndicacao>=4,val:PARAMS.bonus.indicacao.val},
-      {label:PARAMS.bonus.mrrTicket.label,atingido:m.ticketMrr>=4500,val:PARAMS.bonus.mrrTicket.val},
-      {label:PARAMS.bonus.mrrbi.label,atingido:m.ticketMrrBi>=1500,val:PARAMS.bonus.mrrbi.val}
+      {label:PARAMS.bonus.conversao.label,atingido:gatilhoAtingido&&m.convGeral>=0.4,val:PARAMS.bonus.conversao.val},
+      {label:PARAMS.bonus.indicacao.label,atingido:gatilhoAtingido&&m.vendaIndicacao>=4,val:PARAMS.bonus.indicacao.val},
+      {label:PARAMS.bonus.mrrTicket.label,atingido:gatilhoAtingido&&m.ticketMrr>=4500,val:PARAMS.bonus.mrrTicket.val},
+      {label:PARAMS.bonus.mrrbi.label,atingido:gatilhoAtingido&&m.ticketMrrBi>=1500,val:PARAMS.bonus.mrrbi.val}
     ];
-    br.innerHTML=bItems.map(function(b){
+    var bloqueadoMsg = !gatilhoAtingido
+      ? '<div style="font-size:12px;color:rgba(255,255,255,.35);text-align:center;padding:8px 0">🔒 Disponivel apos atingir R$70.000 pagos — faltam '+fmt(PARAMS.totalMin-totalPago)+'</div>'
+      : '';
+    br.innerHTML=bloqueadoMsg+bItems.map(function(b){
       if(b.atingido) totB+=b.val;
       return '<div class="bonus-row"><span class="bonus-nome">'+b.label+'</span>'
         +'<div style="display:flex;align-items:center;gap:10px">'
-        +'<span style="font-size:11px;color:'+(b.atingido?'#1baf7a':'#e34948')+'">'+(b.atingido?'ATINGIDO':'Nao atingido')+'</span>'
+        +'<span style="font-size:11px;color:'+(b.atingido?'#1baf7a':(!gatilhoAtingido?'rgba(255,255,255,.25)':'#e34948'))+'">'+(b.atingido?'ATINGIDO':(!gatilhoAtingido?'Bloqueado':'Nao atingido'))+'</span>'
         +'<span class="bonus-val'+(b.atingido?'':' miss')+'">'+(b.atingido?fmt(b.val):'--')+'</span>'
         +'</div></div>';
     }).join('');
   }
 
-  // Totais finais = comissao canal + campanhas + bonus qualitativos
-  var totalProjFinal = resProj.total + bonusProjTotal + totB;
-  var totalRealFinal = resReal.total + bonusRealTotal + totB;
+  // Totais finais — zerados se nao bateu 70k pago
+  var totalProjFinal = gatilhoAtingido ? (resProj.total + bonusProjTotal + totB) : 0;
+  var totalRealFinal = gatilhoAtingido ? (resReal.total + bonusRealTotal + totB) : 0;
 
   var tpjV = document.getElementById('total-proj');
   var tpjS = document.getElementById('total-proj-sub');
   var trlV = document.getElementById('total-real');
   var trlS = document.getElementById('total-real-sub');
   if(tpjV) tpjV.textContent = fmt(totalProjFinal);
-  if(tpjS) tpjS.textContent = 'Comissao '+fmt(resProj.total)+' + Campanhas '+fmt(bonusProjTotal)+' + Bonus '+fmt(totB);
+  if(tpjS) tpjS.textContent = gatilhoAtingido
+    ? 'Comissao '+fmt(resProj.total)+' + Campanhas '+fmt(bonusProjTotal)+' + Bonus '+fmt(totB)
+    : '🔒 Gatilho: R$70.000 pagos — '+fmt(totalPago)+' pagos ate agora';
   if(trlV) trlV.textContent = fmt(totalRealFinal);
-  if(trlS) trlS.textContent = 'Comissao '+fmt(resReal.total)+' + Campanhas '+fmt(bonusRealTotal)+' + Bonus '+fmt(totB);
+  if(trlS) trlS.textContent = gatilhoAtingido
+    ? 'Comissao '+fmt(resReal.total)+' + Campanhas '+fmt(bonusRealTotal)+' + Bonus '+fmt(totB)
+    : '🔒 Gatilho: R$70.000 pagos — '+fmt(totalPago)+' pagos ate agora';
 }
 
 function mc(lbl,val,sub,tipo){
