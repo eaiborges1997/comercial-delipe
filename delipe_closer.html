@@ -104,6 +104,10 @@ textarea{resize:vertical;min-height:60px}
 /* BOTOES */
 .add-lead-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#ff6b00;background:none;border:.5px dashed rgba(255,107,0,.4);border-radius:8px;padding:7px 16px;cursor:pointer;margin-top:8px;transition:all .15s}
 .add-lead-btn:hover{background:rgba(255,107,0,.08)}
+.save-lead-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#fff;background:#ff6b00;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;transition:all .15s;font-family:Inter,sans-serif}
+.save-lead-btn:hover{background:#e55e00}
+.save-lead-btn.saved{background:#1baf7a}
+.save-lead-btn:disabled{opacity:.5;cursor:default}
 .rm-lead-btn{background:rgba(227,73,72,.1);border:.5px solid rgba(227,73,72,.25);color:#e34948;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-family:'Inter',sans-serif}
 .rm-lead-btn:hover{background:rgba(227,73,72,.2)}
 
@@ -920,6 +924,30 @@ function buildLeadCard(l,i){
   obsEl.oninput=(function(lid){return function(){updateLead(lid,'obs',this.value);};})(l.id);
   obsWrap.appendChild(obsEl);
   body.appendChild(obsWrap);
+
+  // BOTAO SALVAR
+  var saveBar=document.createElement('div'); saveBar.style.cssText='display:flex;justify-content:flex-end;margin-top:14px;margin-bottom:4px';
+  var saveBtn=document.createElement('button');
+  saveBtn.className='save-lead-btn';
+  saveBtn.innerHTML='&#128190; Salvar lead';
+  saveBtn.onclick=(function(lid, btn){
+    return function(){
+      btn.disabled=true;
+      btn.textContent='Salvando...';
+      agendarSalvamento();
+      setTimeout(function(){
+        btn.className='save-lead-btn saved';
+        btn.innerHTML='&#10003; Salvo!';
+        setTimeout(function(){
+          btn.className='save-lead-btn';
+          btn.innerHTML='&#128190; Salvar lead';
+          btn.disabled=false;
+        }, 2000);
+      }, 900);
+    };
+  })(l.id, saveBtn);
+  saveBar.appendChild(saveBtn);
+  body.appendChild(saveBar);
 
   // BOTOES DUPLICAR E REMOVER
   var rmDiv=document.createElement('div'); rmDiv.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:4px';
@@ -2426,7 +2454,7 @@ duplicarLead = function(id){
 var _updateLeadOrig = updateLead;
 updateLead = function(id, campo, val){
   _updateLeadOrig(id, campo, val);
-  agendarSalvamento();
+  // Nao salva automaticamente — usuario usa o botao "Salvar lead"
 };
 
 // ==================== FUNCOES ADMIN FIRESTORE ====================
