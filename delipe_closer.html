@@ -1087,7 +1087,11 @@ function getMetrics(){
 
 function recalc(){
   var m=getMetrics();
-  var nivel=m.totalCombinado>=PARAMS.totalIdeal?'ideal':m.totalCombinado>=PARAMS.totalMin?'min':'abaixo';
+
+  // nivel baseado no VALOR PAGO — so comissiona/bonifica se atingiu 70k pago
+  var leadsPagosCalc = leads.filter(function(l){ return l.status==='Vendido' && l.pago==='Pago'; });
+  var totalPago = leadsPagosCalc.reduce(function(s,l){ return s+l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto; }, 0);
+  var nivel = totalPago >= PARAMS.totalIdeal ? 'ideal' : totalPago >= PARAMS.totalMin ? 'min' : 'abaixo';
 
   // Resumo funil
   setMG('resumo-funil',[
@@ -1164,9 +1168,9 @@ function recalc(){
       }).join('');
   }
 
-  // Status metas
+  // Status metas — progresso baseado no VALOR PAGO
   var sm=document.getElementById('status-metas');
-  if(sm) sm.innerHTML=metaRow('Total Combinado',m.totalCombinado,PARAMS.totalMin,PARAMS.totalIdeal)+metaRow('MRR Recorrente',m.totalMrr+m.totalMrrBi,PARAMS.mrrMin,PARAMS.mrrIdeal);
+  if(sm) sm.innerHTML=metaRow('Total Pago (gatilho comissao)',totalPago,PARAMS.totalMin,PARAMS.totalIdeal)+metaRow('MRR Recorrente',m.totalMrr+m.totalMrrBi,PARAMS.mrrMin,PARAMS.mrrIdeal);
 
   // ---- CAMPANHAS ----
   // Campanha 1: 6+ MRRs vendidos = +2000
