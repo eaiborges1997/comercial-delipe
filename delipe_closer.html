@@ -960,21 +960,21 @@ function buildLeadCard(l,i){
   // -- SECAO 2: REUNIAO INICIAL --
   body.appendChild(sectionTitle('Reuniao Inicial (Diagnostico)'));
   var s2=document.createElement('div'); s2.className='grid2'; s2.style.marginBottom='12px';
-  s2.appendChild(fieldDate('Data da Inicial','dtInicial',l));
+  s2.appendChild(fieldDateTime('Data da Inicial','dtInicial',l));
   s2.appendChild(fieldSelect('Status da Inicial','statusInicial',STATUS_REUNIAO,l));
   body.appendChild(s2);
 
   // -- SECAO 3: REUNIAO DE PROPOSTA --
   body.appendChild(sectionTitle('Reuniao de Proposta (Projeto)'));
   var s3=document.createElement('div'); s3.className='grid2'; s3.style.marginBottom='12px';
-  s3.appendChild(fieldDate('Data da Proposta','dtProposta',l));
+  s3.appendChild(fieldDateTime('Data da Proposta','dtProposta',l));
   s3.appendChild(fieldSelect('Status da Proposta','statusProposta',STATUS_REUNIAO,l));
   body.appendChild(s3);
 
   // -- SECAO 4: FOLLOW-UP (OPCIONAL) --
   body.appendChild(sectionTitle('Follow-up (opcional)'));
   var s4=document.createElement('div'); s4.className='grid2'; s4.style.marginBottom='12px';
-  s4.appendChild(fieldDate('Data do Follow-up','dtFollowup',l));
+  s4.appendChild(fieldDateTime('Data do Follow-up','dtFollowup',l));
   s4.appendChild(fieldSelect('Status do Follow-up','statusFollowup',STATUS_REUNIAO,l));
   body.appendChild(s4);
 
@@ -1100,6 +1100,12 @@ function fieldTelEmail(lbl,campo,l,type){
 function fieldDate(lbl,campo,l){
   var w=fieldWrap(lbl);
   var inp=document.createElement('input'); inp.type='date'; inp.value=l[campo]||'';
+  inp.onchange=(function(lid,c){return function(){updateLead(lid,c,this.value);};})(l.id,campo);
+  w.appendChild(inp); return w;
+}
+function fieldDateTime(lbl,campo,l){
+  var w=fieldWrap(lbl);
+  var inp=document.createElement('input'); inp.type='datetime-local'; inp.value=l[campo]||'';
   inp.onchange=(function(lid,c){return function(){updateLead(lid,c,this.value);};})(l.id,campo);
   w.appendChild(inp); return w;
 }
