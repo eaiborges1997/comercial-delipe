@@ -524,21 +524,28 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 
 <!-- ===== CONFIG ===== -->
 <div id="tab-config" class="tab-content">
-  <div class="card"><div class="sec">Metas do mes</div>
-    <div class="grid2">
-      <div class="field"><label class="lbl">Total Combinado Minimo</label>
-        <div class="currency-wrap"><span class="prefix">R$</span>
-          <input type="text" id="cfg-total-min" placeholder="70.000,00" oninput="onCfgCurrency(this,'totalMin')"></div></div>
-      <div class="field"><label class="lbl">Total Combinado Ideal</label>
-        <div class="currency-wrap"><span class="prefix">R$</span>
-          <input type="text" id="cfg-total-ideal" placeholder="140.000,00" oninput="onCfgCurrency(this,'totalIdeal')"></div></div>
-      <div class="field"><label class="lbl">Meta MRR Minima</label>
-        <div class="currency-wrap"><span class="prefix">R$</span>
-          <input type="text" id="cfg-mrr-min" placeholder="20.000,00" oninput="onCfgCurrency(this,'mrrMin')"></div></div>
-      <div class="field"><label class="lbl">Meta MRR Ideal</label>
-        <div class="currency-wrap"><span class="prefix">R$</span>
-          <input type="text" id="cfg-mrr-ideal" placeholder="40.000,00" oninput="onCfgCurrency(this,'mrrIdeal')"></div></div>
-    </div>
+  <div class="card" style="padding:0">
+    <details>
+      <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
+        METAS DO MES <span style="font-size:11px;color:rgba(255,255,255,.35)">▼</span>
+      </summary>
+      <div style="padding:0 1.5rem 1.5rem">
+        <div class="grid2">
+          <div class="field"><label class="lbl">Total Combinado Minimo</label>
+            <div class="currency-wrap"><span class="prefix">R$</span>
+              <input type="text" id="cfg-total-min" placeholder="70.000,00" oninput="onCfgCurrency(this,'totalMin')"></div></div>
+          <div class="field"><label class="lbl">Total Combinado Ideal</label>
+            <div class="currency-wrap"><span class="prefix">R$</span>
+              <input type="text" id="cfg-total-ideal" placeholder="140.000,00" oninput="onCfgCurrency(this,'totalIdeal')"></div></div>
+          <div class="field"><label class="lbl">Meta MRR Minima</label>
+            <div class="currency-wrap"><span class="prefix">R$</span>
+              <input type="text" id="cfg-mrr-min" placeholder="20.000,00" oninput="onCfgCurrency(this,'mrrMin')"></div></div>
+          <div class="field"><label class="lbl">Meta MRR Ideal</label>
+            <div class="currency-wrap"><span class="prefix">R$</span>
+              <input type="text" id="cfg-mrr-ideal" placeholder="40.000,00" oninput="onCfgCurrency(this,'mrrIdeal')"></div></div>
+        </div>
+      </div>
+    </details>
   </div>
   <div class="card" style="padding:0">
     <details>
@@ -585,28 +592,34 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 
   <!-- SOMENTE ADMIN -->
   <div class="admin-only-section" id="admin-only-config">
-    <div class="card">
-      <div class="sec">Gerenciar usuarios do time</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:14px">
-        Define o perfil de cada pessoa. As mudancas tem efeito no proximo login do usuario.
-      </div>
-      <div class="users-grid" id="users-list">
-        <div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1rem">Carregando usuarios...</div>
-      </div>
-      <div style="margin-top:16px;padding-top:14px;border-top:.5px solid rgba(255,255,255,.08)">
-        <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Cadastrar novo usuario</div>
-        <div class="invite-form">
-          <input type="email" id="invite-email" placeholder="email@delipe.com">
-          <input type="text" id="invite-nome" placeholder="Nome completo" style="max-width:160px">
-          <select id="invite-perfil" style="max-width:120px;padding:8px 10px;font-size:13px;border:.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif">
-            <option value="closer">Closer</option>
-            <option value="sdr">SDR</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button onclick="convidarUsuario()">Cadastrar</button>
+    <div class="card" style="padding:0">
+      <details>
+        <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
+          GERENCIAR USUARIOS DO TIME <span style="font-size:11px;color:rgba(255,255,255,.35)">▼</span>
+        </summary>
+        <div style="padding:0 1.5rem 1.5rem">
+          <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:14px">
+            Define o perfil de cada pessoa. As mudancas tem efeito no proximo login do usuario.
+          </div>
+          <div class="users-grid" id="users-list">
+            <div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1rem">Carregando usuarios...</div>
+          </div>
+          <div style="margin-top:16px;padding-top:14px;border-top:.5px solid rgba(255,255,255,.08)">
+            <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Cadastrar novo usuario</div>
+            <div class="invite-form">
+              <input type="email" id="invite-email" placeholder="email@delipe.com">
+              <input type="text" id="invite-nome" placeholder="Nome completo" style="max-width:160px">
+              <select id="invite-perfil" style="max-width:120px;padding:8px 10px;font-size:13px;border:.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif">
+                <option value="closer">Closer</option>
+                <option value="sdr">SDR</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button onclick="convidarUsuario()">Cadastrar</button>
+            </div>
+            <div id="invite-feedback" style="font-size:12px;margin-top:8px;display:none"></div>
+          </div>
         </div>
-        <div id="invite-feedback" style="font-size:12px;margin-top:8px;display:none"></div>
-      </div>
+      </details>
     </div>
   </div>
 </div>
