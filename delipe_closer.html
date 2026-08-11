@@ -1364,23 +1364,47 @@ async function carregarListaClosers(){
   if(!window._fb || !currentUser) return;
   try {
     var fb = window._fb;
-    var ma = getMesAno();
-    var snap = await fb.getDocs(fb.collection(fb.db,'leads'));
+    var snap = await fb.getDocs(fb.collection(fb.db,'usuarios'));
     var sel = document.getElementById('admin-closer-select');
     sel.innerHTML = '<option value="">-- Selecione --</option>';
-    var adicionados = {};
+    var usuarios = [];
     snap.forEach(function(d){
-      var data = d.data();
-      if(data.mes===ma.mes && String(data.ano)===String(ma.ano) && data.closer && !adicionados[data.closer]){
-        adicionados[data.closer]=true;
-        var opt=document.createElement('option');
-        opt.value=data.closer;
-        var nomeExib=data.closer.split('@')[0];
-        opt.textContent=nomeExib.charAt(0).toUpperCase()+nomeExib.slice(1);
-        sel.appendChild(opt);
-      }
+      var u = d.data();
+      if(u.email && u.perfil !== 'sdr') usuarios.push(u);
     });
-  } catch(e){ console.error(e); }
+    // Ordenar por nome
+    usuarios.sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
+    usuarios.forEach(function(u){
+      var opt = document.createElement('option');
+      opt.value = u.email;
+      var label = (u.nome || u.email.split('@')[0]);
+      label = label.charAt(0).toUpperCase() + label.slice(1);
+      if(u.perfil === 'admin') label += ' (Admin)';
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+    // Adicionar SDRs com separador
+    var sdrs = [];
+    snap.forEach(function(d){
+      var u = d.data();
+      if(u.email && u.perfil === 'sdr') sdrs.push(u);
+    });
+    if(sdrs.length > 0){
+      var sep = document.createElement('option');
+      sep.disabled = true;
+      sep.textContent = '── SDRs ──';
+      sel.appendChild(sep);
+      sdrs.sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
+      sdrs.forEach(function(u){
+        var opt = document.createElement('option');
+        opt.value = u.email;
+        var label = (u.nome || u.email.split('@')[0]);
+        label = label.charAt(0).toUpperCase() + label.slice(1) + ' (SDR)';
+        opt.textContent = label;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e){ console.error('Erro carregarListaClosers:', e); }
 }
 
 async function adminVerMeusDados(){
@@ -1397,14 +1421,19 @@ async function adminVerMeusDados(){
 
 async function adminTrocarCloser(){
   var sel = document.getElementById('admin-closer-select');
-  viewingCloser = sel.value;
-  if(!viewingCloser) return;
+  var email = sel.value;
+  if(!email) return;
+  window._viewingEmail = email;
+  viewingCloser = email;
   document.getElementById('consolidado-wrap').classList.remove('visible');
-  document.getElementById('nome-closer').value = viewingCloser;
+  var nomeExib = sel.options[sel.selectedIndex].textContent;
+  document.getElementById('nome-closer').value = nomeExib.replace(' (Admin)','').replace(' (SDR)','').trim();
   atualizarNome();
-  var aba = nomeAba();
-  await carregarDoSheets(aba);
-  setSyncStatus('connected','Admin — visualizando: '+viewingCloser);
+  var ma = getMesAno();
+  var emailKey = email.replace(/[^a-zA-Z0-9]/g,'_');
+  var chave = emailKey + '__' + ma.mes + '_' + ma.ano;
+  await carregarDoFirestore(chave);
+  setSyncStatus('connected','Admin — visualizando: '+nomeExib);
 }
 
 async function adminVerConsolidado(){
@@ -2368,32 +2397,7 @@ updateLead = function(id, campo, val){
 
 // ==================== FUNCOES ADMIN FIRESTORE ====================
 // ==================== FUNCOES ADMIN ====================
-async function carregarListaClosers(){
-  if(!accessToken) return;
-  try {
-    var resp = await gapi.client.request({
-      path:'https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID,
-      method:'GET'
-    });
-    var sheets = resp.result.sheets.map(function(s){return s.properties.title;});
-    var ma = getMesAno();
-    var sufixo = ma.mes+' '+ma.ano;
-    var closers = [];
-    sheets.forEach(function(s){
-      if(s.indexOf(' - '+sufixo) >= 0){
-        var nome = s.replace(' - '+sufixo,'');
-        closers.push(nome);
-      }
-    });
-    var sel = document.getElementById('admin-closer-select');
-    sel.innerHTML = '<option value="">-- Selecione --</option>';
-    closers.forEach(function(c){
-      var opt = document.createElement('option');
-      opt.value = c; opt.textContent = c;
-      sel.appendChild(opt);
-    });
-  } catch(e){ console.error(e); }
-}
+// carregarListaClosers definida acima (usa Firestore)
 
 async function adminVerMeusDados(){
   // Volta a ver os proprios dados
@@ -2410,14 +2414,19 @@ async function adminVerMeusDados(){
 
 async function adminTrocarCloser(){
   var sel = document.getElementById('admin-closer-select');
-  viewingCloser = sel.value;
-  if(!viewingCloser) return;
+  var email = sel.value;
+  if(!email) return;
+  window._viewingEmail = email;
+  viewingCloser = email;
   document.getElementById('consolidado-wrap').classList.remove('visible');
-  document.getElementById('nome-closer').value = viewingCloser;
+  var nomeExib = sel.options[sel.selectedIndex].textContent;
+  document.getElementById('nome-closer').value = nomeExib.replace(' (Admin)','').replace(' (SDR)','').trim();
   atualizarNome();
-  var aba = nomeAba();
-  await carregarDoSheets(aba);
-  setSyncStatus('connected','Admin — visualizando: '+viewingCloser);
+  var ma = getMesAno();
+  var emailKey = email.replace(/[^a-zA-Z0-9]/g,'_');
+  var chave = emailKey + '__' + ma.mes + '_' + ma.ano;
+  await carregarDoFirestore(chave);
+  setSyncStatus('connected','Admin — visualizando: '+nomeExib);
 }
 
 async function adminVerConsolidado(){
