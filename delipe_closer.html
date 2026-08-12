@@ -1050,7 +1050,12 @@ function buildLeadCard(l,i){
   dupBtn.onclick=(function(lid){return function(){duplicarLead(lid);};})(l.id);
   var rmBtn=document.createElement('button');
   rmBtn.className='rm-lead-btn'; rmBtn.textContent='Remover lead';
-  rmBtn.onclick=(function(lid){return function(){if(confirm('Remover este lead?'))removeLead(lid);};})(l.id);
+  rmBtn.onclick=(function(lid){return function(){
+    if(confirm('Remover este lead?')){
+      removeLead(lid);
+      setSyncStatus('syncing','Removendo lead...');
+    }
+  };})(l.id);
   rmDiv.appendChild(dupBtn);
   rmDiv.appendChild(rmBtn);
   body.appendChild(rmDiv);
@@ -2867,7 +2872,9 @@ addLead = function(){
 var _removeLeadOrig = removeLead;
 removeLead = function(id){
   _removeLeadOrig(id);
-  agendarSalvamento();
+  // Salvar imediatamente — sem delay, para garantir que o lead seja excluido
+  clearTimeout(saveTimeout);
+  salvarNoFirestore();
 };
 
 var _duplicarOrig = duplicarLead;
