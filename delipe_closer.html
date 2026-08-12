@@ -763,7 +763,8 @@ var SERVICOS = [
 var CARGOS   = ['CEO','Dono','Diretor','Gerente','Analista','TI','Outro'];
 var STATUS_REUNIAO_INICIAL  = ['—','Realizada/Avancou','Realizada/Nao avancou','Venda em ligacao','Inicial No-show','Cancelada','Aguardando nova data'];
 var STATUS_REUNIAO_PROPOSTA = ['—','Realizada','Venda em ligacao','Proposta No-show','Cancelada','Aguardando nova data'];
-var STATUS_REUNIAO = STATUS_REUNIAO_PROPOSTA; // alias para followup
+var STATUS_REUNIAO_FOLLOWUP = ['—','Realizada','Venda em ligacao','Follow-up No-show','Cancelada','Aguardando nova data'];
+var STATUS_REUNIAO = STATUS_REUNIAO_PROPOSTA; // alias nao usado
 var STATUS_LEAD    = ['Em andamento','Vendido','Nao avancou','Em negociacao','Nao convertido'];
 var QUALIFICACOES  = ['Qualificado+','Qualificado','Desqualificado','Nao e provedor'];
 var CONTRATO_ST    = ['Sem contrato','Nao assinado','Ag assinatura','Em revisao','Assinado'];
@@ -1076,7 +1077,7 @@ function buildLeadCard(l,i){
   body.appendChild(sectionTitle('Follow-up (opcional)'));
   var s4=document.createElement('div'); s4.className='grid2'; s4.style.marginBottom='12px';
   s4.appendChild(fieldDateTime('Data do Follow-up','dtFollowup',l));
-  s4.appendChild(fieldSelect('Status do Follow-up','statusFollowup',STATUS_REUNIAO,l));
+  s4.appendChild(fieldSelect('Status do Follow-up','statusFollowup',STATUS_REUNIAO_FOLLOWUP,l));
   body.appendChild(s4);
 
   // -- SECAO 5: STATUS FINAL --
