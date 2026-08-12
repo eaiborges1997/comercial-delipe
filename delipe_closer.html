@@ -1434,6 +1434,7 @@ function recalc(){
   var valorPorBi  = c2ativa ? (qtdBiVend>=4 ? 700 : 500) : 0;
   var c2bonus     = 0; // ja contabilizado dentro de calcComissao
   var c2bonusPago = 0; // ja contabilizado dentro de calcComissao
+  var c2bonusDisplay = c2ativa ? qtdBiVend * valorPorBi : 0; // so para exibicao
 
   // Render campanhas
   var cw = document.getElementById('campanhas-wrap');
@@ -1465,7 +1466,7 @@ function recalc(){
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>'+fmt(totalGerado)+' gerados</span><span>gatilho: '+fmt(80000)+'</span></div>'
           +'<div class="progress-bar"><div class="progress-fill'+(c2ativa?' green':'')+'" style="width:'+c2p+'%"></div></div>'
         +'</div>'
-        +'<div class="campanha-val">'+(c2ativa?'R$ '+valorPorBi+'/BI x '+qtdBiVend+' = '+ fmt(c2bonus):'faltam '+fmt(Math.max(80000-totalGerado,0)))+'</div>'
+        +'<div class="campanha-val">'+(c2ativa?'R$ '+valorPorBi+'/BI x '+qtdBiVend+' = '+ fmt(c2bonusDisplay):'faltam '+fmt(Math.max(80000-totalGerado,0)))+'</div>'
       +'</div>';
   }
 
