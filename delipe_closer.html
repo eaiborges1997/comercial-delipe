@@ -2407,10 +2407,22 @@ function mostrarAppComPerfil(user){
   var perfil = user._perfil || 'closer';
   user.isAdmin = (perfil==='admin') || (window._fb && window._fb.ADMINS.indexOf(user.email)>=0);
   window._isSdr = (perfil==='sdr');
-  // Atualizar mapeamento SDR dinamicamente
+  // Atualizar mapeamento SDR dinamicamente — funciona para Google e email/senha
   if(perfil==='sdr'){
-    var nomeDisplay = user.displayName||user.email.split('@')[0];
-    SDR_EMAILS[user.email] = nomeDisplay.toUpperCase().split(' ')[0];
+    // Buscar nome do Firestore se nao tiver displayName (usuarios email/senha)
+    if(!SDR_EMAILS[user.email]){
+      var emailKey=user.email.replace(/[^a-zA-Z0-9]/g,'_');
+      window._fb.getDoc(window._fb.doc(window._fb.db,'usuarios',emailKey)).then(function(snap){
+        var nomeFs = snap.exists() ? (snap.data().nome||user.email.split('@')[0]) : user.email.split('@')[0];
+        SDR_EMAILS[user.email] = nomeFs.toUpperCase().split(' ')[0];
+        user.nome = nomeFs;
+        mostrarApp(user);
+      }).catch(function(){
+        SDR_EMAILS[user.email] = user.email.split('@')[0].toUpperCase();
+        mostrarApp(user);
+      });
+      return; // mostrarApp chamado dentro do .then
+    }
   }
   mostrarApp(user);
 }
@@ -2605,12 +2617,14 @@ function iniciarFirebaseAuth(){
 
   // Monitorar estado de autenticacao
   window._fb.onAuthStateChanged(window._fb.auth, function(user){
+    // Se fazerLoginEmail ja esta gerenciando o fluxo, ignorar este disparo
+    if(window._handlingEmailLogin) return;
     if(user && user.email){
       var fb2=window._fb;
       var emailKey2 = user.email.replace(/[^a-zA-Z0-9]/g,'_');
       fb2.getDoc(fb2.doc(fb2.db,'usuarios',emailKey2)).then(function(snap){
         if(!snap.exists()){
-          // Nao esta cadastrado no Firestore — negar acesso (exceto @delipe.com auto-register)
+          // Nao cadastrado no Firestore
           if(user.email.endsWith('@delipe.com')){
             var perfilAuto = SDR_EMAILS[user.email]?'sdr':(fb2.ADMINS.indexOf(user.email)>=0?'admin':'closer');
             fb2.setDoc(fb2.doc(fb2.db,'usuarios',emailKey2),{
@@ -2626,8 +2640,9 @@ function iniciarFirebaseAuth(){
         }
         var data=snap.data();
         user._perfil = data.perfil||'closer';
-        // Verificar se precisa trocar senha (apenas email/senha, nao Google)
-        if(data.mustChangePassword && !user.providerData.some(function(p){return p.providerId==='google.com';})){
+        // Verificar mustChangePassword — aplica a qualquer provider exceto Google
+        var isGoogle = user.providerData && user.providerData.some(function(p){return p.providerId==='google.com';});
+        if(data.mustChangePassword && !isGoogle){
           window._pendingUser=user;
           mostrarTrocaSenha();
           return;
@@ -2905,6 +2920,8 @@ function fazerLoginEmail(){
     erro.style.display='block';erro.textContent='Preencha email e senha.';return;
   }
   btn.textContent='Entrando...'; btn.disabled=true;
+  // Bloquear onAuthStateChanged enquanto gerenciamos o login aqui
+  window._handlingEmailLogin = true;
   var fb=window._fb;
   fb.signInWithEmailAndPassword(fb.auth, email, senha)
     .then(function(result){
@@ -2913,13 +2930,16 @@ function fazerLoginEmail(){
       fb.getDoc(fb.doc(fb.db,'usuarios',emailKey)).then(function(snap){
         if(!snap.exists()){
           erro.style.display='block';erro.textContent='Conta nao autorizada. Contate o admin.';
-          fb.signOut(fb.auth); btn.textContent='Entrar'; btn.disabled=false; return;
+          fb.signOut(fb.auth);
+          btn.textContent='Entrar'; btn.disabled=false;
+          window._handlingEmailLogin = false;
+          return;
         }
         var data=snap.data();
         user._perfil=data.perfil||'closer';
+        window._handlingEmailLogin = false;
         // Verificar se precisa trocar senha
         if(data.mustChangePassword){
-          // Guarda usuario para depois completar login
           window._pendingUser=user;
           mostrarTrocaSenha();
         } else {
@@ -2928,15 +2948,17 @@ function fazerLoginEmail(){
       }).catch(function(e){
         erro.style.display='block';erro.textContent='Erro ao verificar conta: '+e.message;
         btn.textContent='Entrar'; btn.disabled=false;
+        window._handlingEmailLogin = false;
       });
     })
     .catch(function(e){
       var msg='Email ou senha incorretos.';
       if(e.code==='auth/too-many-requests') msg='Muitas tentativas. Tente mais tarde.';
-      if(e.code==='auth/user-not-found') msg='Email nao encontrado.';
+      if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential') msg='Email ou senha incorretos.';
       if(e.code==='auth/invalid-email') msg='Email invalido.';
       erro.style.display='block';erro.textContent=msg;
       btn.textContent='Entrar'; btn.disabled=false;
+      window._handlingEmailLogin = false;
     });
 }
 
@@ -3254,7 +3276,12 @@ async function carregarDoFirestore(chave){
     console.error('Erro ao carregar:', e);
     leads = [];
     if(window._isSdr){ recalcSdr(); } else { renderLeads(); }
-    setSyncStatus('connected','Erro ao carregar');
+    var errMsg = 'Erro ao carregar';
+    if(e && e.code === 'permission-denied'){
+      errMsg = 'Sem permissao — verifique as regras do Firestore';
+      console.warn('FIRESTORE RULES: Permita acesso a usuarios autenticados. Acesse Firebase Console > Firestore > Rules e use: allow read, write: if request.auth != null;');
+    }
+    setSyncStatus('error', errMsg);
   }
 }
 
