@@ -306,6 +306,27 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 .chpw-req{font-size:11px;color:rgba(255,255,255,.3);text-align:left;margin-bottom:12px;line-height:1.6}
 
 /* HOME */
+.home-campanha-card{background:linear-gradient(135deg,rgba(255,107,0,.12),rgba(255,153,64,.06));border:.5px solid rgba(255,107,0,.3);border-radius:16px;padding:1.4rem 1.6rem;position:relative;overflow:hidden}
+.home-campanha-card .hcc-label{font-size:11px;font-weight:700;color:#ff9940;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.home-campanha-card .hcc-trophy{font-size:18px}
+.home-campanha-card .hcc-meta{font-size:13px;color:rgba(255,255,255,.45);margin-bottom:16px}
+.hcc-grid{display:grid;grid-template-columns:1fr 1px 1fr;gap:0;margin-bottom:14px}
+.hcc-divider{background:rgba(255,255,255,.1);width:1px}
+.hcc-side{padding:0 16px}
+.hcc-side:first-child{padding-left:0}
+.hcc-side:last-child{padding-right:0}
+.hcc-side-label{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.hcc-side-val{font-size:26px;font-weight:800;color:#fff;line-height:1}
+.hcc-side-sub{font-size:12px;color:rgba(255,255,255,.35);margin-top:4px}
+.hcc-side-mrr{font-size:16px;font-weight:700;color:#1baf7a;margin-top:8px}
+.hcc-bar-wrap{background:rgba(255,255,255,.08);border-radius:6px;height:10px;margin-bottom:8px;overflow:hidden;position:relative}
+.hcc-bar-inner{height:10px;border-radius:6px;transition:width .6s;background:linear-gradient(90deg,#ff6b00,#ff9940)}
+.hcc-bar-inner.full{background:linear-gradient(90deg,#1baf7a,#22d3a0)}
+.hcc-pct-row{display:flex;justify-content:space-between;font-size:12px}
+.hcc-stars{display:flex;gap:4px;margin-top:10px}
+.hcc-star{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1)}
+.hcc-star.done{background:rgba(255,107,0,.2);border-color:rgba(255,107,0,.4)}
+.hcc-star.paid{background:rgba(27,175,122,.2);border-color:rgba(27,175,122,.4)}
 .home-meta-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:16px;padding:1.4rem 1.6rem;position:relative;overflow:hidden}
 .home-meta-card .hmc-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
 .home-meta-card .hmc-meta{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:14px}
@@ -580,6 +601,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   <div id="home-content" style="display:none">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px" id="home-cards-meta"></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px" id="home-cards-extra"></div>
+    <div id="home-campanha-wrap" style="margin-top:14px"></div>
   </div>
 
   <div id="home-time-grid" style="display:none">
@@ -3142,6 +3164,79 @@ function gerarSenhaTemp(){
 }
 
 
+
+// ==================== CAMPANHA 6 RECORRENCIAS ====================
+// Recorrencia = lead vendido com mrrServ > 0 OU mrrBi > 0
+// Periodo: mensal (6) ou trimestral (18) acumulativo
+// Projecao = status Vendido + pago 'Ag pagamento' ou 'Pago' + mrrServ/mrrBi > 0
+// Confirmado = pago === 'Pago' + mrrServ/mrrBi > 0
+
+function _isRecorrencia(l){
+  return l.status === 'Vendido' && ((l.mrrServ||0) > 0 || (l.mrrBi||0) > 0);
+}
+
+function _calcCampanha(leadsArr){
+  var proj = 0, conf = 0, mrrProj = 0, mrrConf = 0;
+  leadsArr.forEach(function(l){
+    if(!_isRecorrencia(l)) return;
+    var pago = l.pago || '';
+    var mrr = (l.mrrServ||0) + (l.mrrBi||0);
+    if(pago === 'Ag pagamento' || pago === 'Pago'){
+      proj++;
+      mrrProj += mrr;
+    }
+    if(pago === 'Pago'){
+      conf++;
+      mrrConf += mrr;
+    }
+  });
+  return {proj:proj, conf:conf, mrrProj:mrrProj, mrrConf:mrrConf};
+}
+
+function _renderCampanha(dados, meta, labelPeriodo){
+  var wrap = document.getElementById('home-campanha-wrap');
+  if(!wrap) return;
+  var pct = meta > 0 ? Math.min(100, Math.round(dados.proj / meta * 100)) : 0;
+  var isFull = dados.proj >= meta;
+
+  // Stars — uma por recorrencia (max 6 por linha, duas linhas se trimestre)
+  var starsHtml = '';
+  for(var i = 0; i < meta; i++){
+    var isDone = i < dados.proj;
+    var isPaid = i < dados.conf;
+    var cls = isPaid ? 'hcc-star paid' : isDone ? 'hcc-star done' : 'hcc-star';
+    var icon = isPaid ? '✓' : isDone ? '◉' : '○';
+    starsHtml += '<div class="'+cls+'" title="'+(isPaid?'Pago':isDone?'Ag. pagamento':'Pendente')+'">'+icon+'</div>';
+  }
+
+  wrap.innerHTML = '<div class="home-campanha-card">'
+    +'<div class="hcc-label"><span class="hcc-trophy">🏆</span> Campanha de Recorrências</div>'
+    +'<div class="hcc-meta">Meta '+labelPeriodo+': <strong style="color:#ff9940">'+meta+' recorrências</strong> · Serviços com MRR</div>'
+    +'<div class="hcc-grid">'
+      +'<div class="hcc-side">'
+        +'<div class="hcc-side-label">Projeção (vendido + ag. pag.)</div>'
+        +'<div class="hcc-side-val" style="color:'+(isFull?'#1baf7a':'#ff9940')+'">'+dados.proj+'<span style="font-size:14px;color:rgba(255,255,255,.3);font-weight:400"> / '+meta+'</span></div>'
+        +'<div class="hcc-side-sub">recorrências projetadas</div>'
+        +'<div class="hcc-side-mrr" style="color:#ff9940">'+_homeF(dados.mrrProj)+'/mês</div>'
+      +'</div>'
+      +'<div class="hcc-divider"></div>'
+      +'<div class="hcc-side">'
+        +'<div class="hcc-side-label">Confirmado (pago)</div>'
+        +'<div class="hcc-side-val" style="color:#1baf7a">'+dados.conf+'<span style="font-size:14px;color:rgba(255,255,255,.3);font-weight:400"> / '+meta+'</span></div>'
+        +'<div class="hcc-side-sub">recorrências pagas</div>'
+        +'<div class="hcc-side-mrr">'+_homeF(dados.mrrConf)+'/mês</div>'
+      +'</div>'
+    +'</div>'
+    +'<div class="hcc-bar-wrap"><div class="hcc-bar-inner'+(isFull?' full':'')+'" style="width:'+pct+'%"></div></div>'
+    +'<div class="hcc-pct-row">'
+      +'<span style="color:'+(isFull?'#1baf7a':'#ff9940')+';font-weight:700">'+pct+'% da meta</span>'
+      +'<span style="color:rgba(255,255,255,.3)">Faltam '+(Math.max(0,meta-dados.proj))+' recorrências</span>'
+    +'</div>'
+    +'<div class="hcc-stars">'+starsHtml+'</div>'
+    +(isFull?'<div style="margin-top:12px;padding:8px 12px;background:rgba(27,175,122,.15);border:.5px solid rgba(27,175,122,.3);border-radius:8px;font-size:12px;color:#1baf7a;font-weight:600;text-align:center">🎉 Meta de recorrências atingida!</div>':'')
+    +'</div>';
+}
+
 // ==================== HOME ====================
 var _homeView = 'mes';       // 'mes' | 'tri'
 var _homeUserView = 'eu';    // 'eu' | 'time'  (admin only)
@@ -3247,6 +3342,8 @@ async function carregarHome(){
       }
     });
     _renderHomeCards(totalComb, totalPago, metaMensal, 'mensal');
+    var dadosCamp = _calcCampanha(leads);
+    _renderCampanha(dadosCamp, 6, 'mensal (6 recorrências)');
 
   } else {
     // Trimestre — carregar 3 meses
@@ -3276,6 +3373,19 @@ async function carregarHome(){
       }
     } catch(e){ console.warn('tri load err', e); }
     _renderHomeCards(totalCombTri, totalPagoTri, metaTrimestral, 'trimestral');
+    // Calcular campanha trimestral — agregar leads dos 3 meses
+    var leadsTri = [];
+    try {
+      for(var j=0;j<mesesTri.length;j++){
+        var chaveCamp = emailKey+'__'+mesesTri[j]+'_'+ano;
+        var snapCamp = await fb.getDoc(fb.doc(fb.db,'leads',chaveCamp));
+        if(snapCamp.exists() && snapCamp.data().leads){
+          leadsTri = leadsTri.concat(snapCamp.data().leads);
+        }
+      }
+    } catch(e){ console.warn('camp tri err',e); }
+    var dadosCampTri = _calcCampanha(leadsTri);
+    _renderCampanha(dadosCampTri, 18, 'trimestral (18 recorrências)');
   }
 
   if(isAdmin && _homeUserView==='time'){
