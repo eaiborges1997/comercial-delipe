@@ -275,6 +275,43 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 .login-btn:hover{opacity:.88}
 .login-btn svg{width:18px;height:18px}
 .login-footer{position:absolute;bottom:18px;font-size:11px;color:rgba(255,255,255,.15);z-index:2}
+
+/* EMAIL LOGIN TOGGLE */
+.login-separator{display:flex;align-items:center;gap:10px;margin:1rem 0;width:100%}
+.login-separator::before,.login-separator::after{content:'';flex:1;border-top:.5px solid rgba(255,255,255,.1)}
+.login-separator-text{font-size:11px;color:rgba(255,255,255,.25);white-space:nowrap}
+.login-email-form{display:none;flex-direction:column;gap:8px;width:100%}
+.login-email-form.active{display:flex}
+.login-email-input{width:100%;padding:11px 14px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.12);border-radius:10px;font-size:13px;color:#fff;font-family:Inter,sans-serif;outline:none;box-sizing:border-box}
+.login-email-input::placeholder{color:rgba(255,255,255,.3)}
+.login-email-input:focus{border-color:rgba(255,107,0,.5)}
+.login-email-btn{width:100%;padding:12px;background:#ff6b00;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:opacity .15s}
+.login-email-btn:hover{opacity:.88}
+.login-toggle-link{font-size:12px;color:rgba(255,107,0,.7);text-align:center;cursor:pointer;margin-top:4px}
+.login-toggle-link:hover{color:#ff6b00}
+
+/* CHANGE PASSWORD SCREEN */
+#change-password-screen{position:fixed;inset:0;background:#0d0720;z-index:9998;display:none;align-items:center;justify-content:center;flex-direction:column;overflow:hidden}
+#change-password-screen.active{display:flex}
+.chpw-box{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:20px;padding:2.5rem 2.2rem;width:360px;position:relative;z-index:2;text-align:center}
+.chpw-icon{font-size:36px;margin-bottom:1rem}
+.chpw-titulo{font-size:20px;font-weight:700;color:#fff;margin-bottom:6px}
+.chpw-sub{font-size:13px;color:rgba(255,255,255,.38);margin-bottom:1.6rem;line-height:1.6}
+.chpw-input{width:100%;padding:11px 14px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.12);border-radius:10px;font-size:13px;color:#fff;font-family:Inter,sans-serif;outline:none;box-sizing:border-box;margin-bottom:8px}
+.chpw-input::placeholder{color:rgba(255,255,255,.3)}
+.chpw-input:focus{border-color:rgba(255,107,0,.5)}
+.chpw-btn{width:100%;padding:12px;background:#ff6b00;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:opacity .15s}
+.chpw-btn:hover{opacity:.88}
+.chpw-erro{font-size:12px;color:#e34948;margin-top:8px;display:none;text-align:center}
+.chpw-req{font-size:11px;color:rgba(255,255,255,.3);text-align:left;margin-bottom:12px;line-height:1.6}
+
+/* CREDENTIAL MESSAGE CARD */
+.cred-card{background:rgba(255,107,0,.08);border:.5px solid rgba(255,107,0,.25);border-radius:12px;padding:14px 16px;margin-top:12px;display:none}
+.cred-card.active{display:block}
+.cred-card-title{font-size:12px;font-weight:700;color:#ff6b00;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
+.cred-card-body{font-size:12px;color:rgba(255,255,255,.7);line-height:1.7;font-family:monospace;white-space:pre-wrap;word-break:break-all}
+.cred-copy-btn{margin-top:10px;padding:7px 16px;background:#ff6b00;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:opacity .15s}
+.cred-copy-btn:hover{opacity:.88}
 .login-user-bar{position:fixed;top:0;left:0;right:0;background:rgba(26,10,46,.95);backdrop-filter:blur(8px);border-bottom:.5px solid rgba(255,255,255,.08);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:10px}
 .login-user-bar.hidden{display:none}
 .login-user-info{display:flex;align-items:center;gap:10px}
@@ -318,7 +355,8 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 </style>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged }
+  import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
+    signInWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential }
     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
   import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs,
     query, where, orderBy, writeBatch, serverTimestamp, onSnapshot }
@@ -344,7 +382,9 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   // Expor globalmente
   window._fb = { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged,
     GoogleAuthProvider, doc, getDoc, setDoc, deleteDoc, collection, getDocs,
-    query, where, orderBy, writeBatch, serverTimestamp, onSnapshot, ADMINS };
+    query, where, orderBy, writeBatch, serverTimestamp, onSnapshot, ADMINS,
+    signInWithEmailAndPassword, updatePassword,
+    EmailAuthProvider, reauthenticateWithCredential };
 
   // Expor login globalmente a partir do modulo
   window._fbLogin = function(){
@@ -376,9 +416,34 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
       <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
       Entrar com Google
     </button>
+    <div class="login-separator"><span class="login-separator-text">ou acesso com senha</span></div>
+    <div class="login-email-form" id="login-email-form">
+      <input type="email" class="login-email-input" id="login-email-field" placeholder="seu@email.com" autocomplete="email">
+      <input type="password" class="login-email-input" id="login-senha-field" placeholder="Senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')fazerLoginEmail()">
+      <button class="login-email-btn" id="btn-email-login" onclick="fazerLoginEmail()">Entrar</button>
+      <div class="login-toggle-link" onclick="toggleEmailForm(false)">← Voltar para login com Google</div>
+    </div>
+    <div id="login-toggle-email-link" class="login-toggle-link" onclick="toggleEmailForm(true)" style="margin-top:10px">Entrar com email e senha</div>
     <div id="login-erro" style="font-size:12px;color:#e34948;margin-top:12px;display:none;text-align:center">Acesso negado. Sua conta nao esta autorizada.</div>
   </div>
   <div class="login-footer">Comercial Delipe &mdash; Versão Interna</div>
+</div>
+
+<!-- TELA TROCAR SENHA (primeiro acesso) -->
+<div id="change-password-screen">
+  <div class="login-orb1"></div>
+  <div class="login-orb2"></div>
+  <div class="login-grid"></div>
+  <div class="chpw-box">
+    <div class="chpw-icon">🔐</div>
+    <div class="chpw-titulo">Crie sua senha</div>
+    <div class="chpw-sub">Este é seu primeiro acesso. Por segurança, defina uma senha pessoal antes de continuar.</div>
+    <div class="chpw-req">• Mínimo 6 caracteres<br>• As senhas devem ser iguais</div>
+    <input type="password" class="chpw-input" id="chpw-nova" placeholder="Nova senha" autocomplete="new-password">
+    <input type="password" class="chpw-input" id="chpw-confirma" placeholder="Confirmar senha" autocomplete="new-password" onkeydown="if(event.key==='Enter')salvarNovaSenha()">
+    <button class="chpw-btn" onclick="salvarNovaSenha()">Salvar e entrar</button>
+    <div class="chpw-erro" id="chpw-erro"></div>
+  </div>
 </div>
 
 <!-- BARRA DO USUARIO LOGADO -->
@@ -693,8 +758,9 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
           </div>
           <div style="margin-top:16px;padding-top:14px;border-top:.5px solid rgba(255,255,255,.08)">
             <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Cadastrar novo usuario</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.25);margin-bottom:10px">Para usuarios com Google (@delipe.com), apenas o cadastro no Firestore é necessário. Para emails externos, o sistema cria login com senha temporária.</div>
             <div class="invite-form">
-              <input type="email" id="invite-email" placeholder="email@delipe.com">
+              <input type="email" id="invite-email" placeholder="email (qualquer domínio)">
               <input type="text" id="invite-nome" placeholder="Nome completo" style="max-width:160px">
               <select id="invite-perfil" style="max-width:120px;padding:8px 10px;font-size:13px;border:.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif">
                 <option value="closer">Closer</option>
@@ -704,6 +770,11 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
               <button onclick="convidarUsuario()">Cadastrar</button>
             </div>
             <div id="invite-feedback" style="font-size:12px;margin-top:8px;display:none"></div>
+            <div class="cred-card" id="cred-card">
+              <div class="cred-card-title">📋 Credenciais para compartilhar</div>
+              <div class="cred-card-body" id="cred-card-body"></div>
+              <button class="cred-copy-btn" onclick="copiarCredenciais()">Copiar mensagem</button>
+            </div>
           </div>
         </div>
       </details>
@@ -2534,14 +2605,34 @@ function iniciarFirebaseAuth(){
 
   // Monitorar estado de autenticacao
   window._fb.onAuthStateChanged(window._fb.auth, function(user){
-    if(user && user.email && user.email.endsWith('@delipe.com')){
+    if(user && user.email){
       var fb2=window._fb;
       var emailKey2 = user.email.replace(/[^a-zA-Z0-9]/g,'_');
       fb2.getDoc(fb2.doc(fb2.db,'usuarios',emailKey2)).then(function(snap){
-        if(snap.exists()) user._perfil = snap.data().perfil||'closer';
-        else user._perfil = SDR_EMAILS[user.email]?'sdr':(fb2.ADMINS.indexOf(user.email)>=0?'admin':'closer');
+        if(!snap.exists()){
+          // Nao esta cadastrado no Firestore — negar acesso (exceto @delipe.com auto-register)
+          if(user.email.endsWith('@delipe.com')){
+            var perfilAuto = SDR_EMAILS[user.email]?'sdr':(fb2.ADMINS.indexOf(user.email)>=0?'admin':'closer');
+            fb2.setDoc(fb2.doc(fb2.db,'usuarios',emailKey2),{
+              email:user.email,nome:user.displayName||user.email.split('@')[0],perfil:perfilAuto
+            },{merge:true});
+            user._perfil = perfilAuto;
+            mostrarAppComPerfil(user);
+          } else {
+            fb2.signOut(fb2.auth);
+            esconderApp();
+          }
+          return;
+        }
+        var data=snap.data();
+        user._perfil = data.perfil||'closer';
+        // Verificar se precisa trocar senha (apenas email/senha, nao Google)
+        if(data.mustChangePassword && !user.providerData.some(function(p){return p.providerId==='google.com';})){
+          window._pendingUser=user;
+          mostrarTrocaSenha();
+          return;
+        }
         mostrarAppComPerfil(user);
-        // Carregar lista de usuarios — tentar 3x para garantir que Firebase esteja pronto
         if(user._perfil==='admin' || fb2.ADMINS.indexOf(user.email)>=0){
           setTimeout(function(){ carregarUsuarios(true); }, 500);
           setTimeout(function(){ carregarUsuarios(true); }, 1500);
@@ -2700,7 +2791,9 @@ async function convidarUsuario(){
   var nome   = document.getElementById('invite-nome').value.trim();
   var perfil = document.getElementById('invite-perfil').value;
   var fb2    = document.getElementById('invite-feedback');
+  var credCard = document.getElementById('cred-card');
   fb2.style.display='none';
+  credCard.classList.remove('active');
   if(!email||!nome){
     fb2.style.display='block';fb2.style.color='#e34948';
     fb2.textContent='Preencha e-mail e nome.';return;
@@ -2712,21 +2805,226 @@ async function convidarUsuario(){
     fb2.style.display='block';fb2.style.color='#e34948';
     fb2.textContent='Firebase nao conectado. Recarregue a pagina e tente novamente.';return;
   }
+  var fb = window._fb;
+  var emailKey = email.replace(/[^a-zA-Z0-9]/g,'_');
+  var isDelipe = email.endsWith('@delipe.com');
+
   try {
-    var fb = window._fb;
-    var emailKey = email.replace(/[^a-zA-Z0-9]/g,'_');
-    var docRef = fb.doc(fb.db,'usuarios',emailKey);
-    await fb.setDoc(docRef,{email:email,nome:nome,perfil:perfil,criadoEm:Date.now()},{merge:true});
-    fb2.style.display='block';fb2.style.color='#1baf7a';
-    fb2.textContent='Usuario '+nome+' ('+perfil+') cadastrado! Ele deve acessar com Google usando '+email+'.';
+    if(isDelipe){
+      // Usuario Google: apenas Firestore, sem Auth manual
+      await fb.setDoc(fb.doc(fb.db,'usuarios',emailKey),{
+        email:email,nome:nome,perfil:perfil,criadoEm:Date.now()
+      },{merge:true});
+      fb2.style.display='block';fb2.style.color='#1baf7a';
+      fb2.textContent='Usuario '+nome+' ('+perfil+') cadastrado! Ele entra com Google usando '+email+'.';
+    } else {
+      // Email externo: criar conta via REST API (nao afeta sessao do admin)
+      var senhaTemp = gerarSenhaTemp();
+      var FIREBASE_API_KEY = 'AIzaSyC9ssu1QDyA4-iVP3Y3AeqHxCfywtOJS6g';
+      var restResp = await fetch(
+        'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + FIREBASE_API_KEY,
+        {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({email:email, password:senhaTemp, returnSecureToken:false})
+        }
+      );
+      var restData = await restResp.json();
+      if(!restResp.ok){
+        var errCode = restData.error && restData.error.message;
+        if(errCode === 'EMAIL_EXISTS'){
+          // Conta ja existe no Auth — apenas atualiza Firestore
+          await fb.setDoc(fb.doc(fb.db,'usuarios',emailKey),{
+            email:email,nome:nome,perfil:perfil,mustChangePassword:false
+          },{merge:true});
+          fb2.style.display='block';fb2.style.color='#ff9940';
+          fb2.textContent='Conta ja existe. Dados de perfil atualizados para '+nome+' ('+perfil+').';
+          await carregarUsuarios();
+          return;
+        }
+        if(errCode === 'INVALID_EMAIL') throw new Error('Email invalido.');
+        if(errCode === 'WEAK_PASSWORD : Password should be at least 6 characters') throw new Error('Senha fraca.');
+        throw new Error(errCode || 'Erro ao criar conta no Firebase Auth.');
+      }
+      // Conta criada via REST — sessao do admin intacta
+      // Salvar no Firestore com flag mustChangePassword
+      await fb.setDoc(fb.doc(fb.db,'usuarios',emailKey),{
+        email:email,nome:nome,perfil:perfil,
+        mustChangePassword:true,criadoEm:Date.now()
+      },{merge:true});
+      // Montar mensagem de credenciais
+      var url = window.location.href.split('?')[0];
+      var msg = 'Olá, '+nome+'!
+
+Seu acesso ao Sistema Comercial Delipe foi criado.
+
+'
+              + '🔗 Link: '+url+'
+'
+              + '📧 Login: '+email+'
+'
+              + '🔑 Senha temporária: '+senhaTemp+'
+
+'
+              + 'No primeiro acesso você será obrigado(a) a criar uma senha pessoal.
+
+'
+              + 'Qualquer dúvida, fale com o administrador.';
+      _ultimasCredenciais = msg;
+      document.getElementById('cred-card-body').textContent = msg;
+      credCard.classList.add('active');
+      fb2.style.display='block';fb2.style.color='#1baf7a';
+      fb2.textContent='Conta criada para '+nome+' ('+perfil+'). Compartilhe as credenciais abaixo.';
+    }
     document.getElementById('invite-email').value='';
     document.getElementById('invite-nome').value='';
     await carregarUsuarios();
   } catch(e){
     console.error('Erro cadastrar usuario:', e);
+    var errMsg='Erro: '+e.message;
+    if(e.code==='auth/invalid-email') errMsg='Email invalido.';
+    if(e.code==='auth/weak-password') errMsg='Senha fraca (minimo 6 chars).';
     fb2.style.display='block';fb2.style.color='#e34948';
-    fb2.textContent='Erro: '+e.message;
+    fb2.textContent=errMsg;
   }
+}
+
+
+// ==================== EMAIL/SENHA LOGIN ====================
+function toggleEmailForm(show){
+  var form = document.getElementById('login-email-form');
+  var link = document.getElementById('login-toggle-email-link');
+  var btnGoogle = document.getElementById('btn-google-login');
+  var sep = form.previousElementSibling;
+  if(show){
+    form.classList.add('active');
+    if(link) link.style.display='none';
+    document.getElementById('login-email-field').focus();
+  } else {
+    form.classList.remove('active');
+    if(link) link.style.display='block';
+    document.getElementById('login-email-field').value='';
+    document.getElementById('login-senha-field').value='';
+    document.getElementById('login-erro').style.display='none';
+  }
+}
+
+function fazerLoginEmail(){
+  if(!window._fb){ alert('Firebase nao carregou. Recarregue a pagina.'); return; }
+  var email = document.getElementById('login-email-field').value.trim().toLowerCase();
+  var senha = document.getElementById('login-senha-field').value;
+  var erro  = document.getElementById('login-erro');
+  var btn   = document.getElementById('btn-email-login');
+  erro.style.display='none';
+  if(!email||!senha){
+    erro.style.display='block';erro.textContent='Preencha email e senha.';return;
+  }
+  btn.textContent='Entrando...'; btn.disabled=true;
+  var fb=window._fb;
+  fb.signInWithEmailAndPassword(fb.auth, email, senha)
+    .then(function(result){
+      var user=result.user;
+      var emailKey=user.email.replace(/[^a-zA-Z0-9]/g,'_');
+      fb.getDoc(fb.doc(fb.db,'usuarios',emailKey)).then(function(snap){
+        if(!snap.exists()){
+          erro.style.display='block';erro.textContent='Conta nao autorizada. Contate o admin.';
+          fb.signOut(fb.auth); btn.textContent='Entrar'; btn.disabled=false; return;
+        }
+        var data=snap.data();
+        user._perfil=data.perfil||'closer';
+        // Verificar se precisa trocar senha
+        if(data.mustChangePassword){
+          // Guarda usuario para depois completar login
+          window._pendingUser=user;
+          mostrarTrocaSenha();
+        } else {
+          mostrarAppComPerfil(user);
+        }
+      }).catch(function(e){
+        erro.style.display='block';erro.textContent='Erro ao verificar conta: '+e.message;
+        btn.textContent='Entrar'; btn.disabled=false;
+      });
+    })
+    .catch(function(e){
+      var msg='Email ou senha incorretos.';
+      if(e.code==='auth/too-many-requests') msg='Muitas tentativas. Tente mais tarde.';
+      if(e.code==='auth/user-not-found') msg='Email nao encontrado.';
+      if(e.code==='auth/invalid-email') msg='Email invalido.';
+      erro.style.display='block';erro.textContent=msg;
+      btn.textContent='Entrar'; btn.disabled=false;
+    });
+}
+
+// ==================== TROCA DE SENHA (PRIMEIRO ACESSO) ====================
+function mostrarTrocaSenha(){
+  document.getElementById('change-password-screen').classList.add('active');
+}
+
+function esconderTrocaSenha(){
+  document.getElementById('change-password-screen').classList.remove('active');
+}
+
+async function salvarNovaSenha(){
+  var nova     = document.getElementById('chpw-nova').value;
+  var confirma = document.getElementById('chpw-confirma').value;
+  var erro     = document.getElementById('chpw-erro');
+  var btn      = document.querySelector('.chpw-btn');
+  erro.style.display='none';
+  if(!nova||!confirma){
+    erro.style.display='block';erro.textContent='Preencha os dois campos.';return;
+  }
+  if(nova.length<6){
+    erro.style.display='block';erro.textContent='A senha deve ter pelo menos 6 caracteres.';return;
+  }
+  if(nova!==confirma){
+    erro.style.display='block';erro.textContent='As senhas nao conferem.';return;
+  }
+  btn.textContent='Salvando...'; btn.disabled=true;
+  var fb=window._fb;
+  var user=window._fb.auth.currentUser;
+  if(!user){
+    erro.style.display='block';erro.textContent='Sessao expirada. Faca login novamente.';
+    btn.textContent='Salvar e entrar'; btn.disabled=false; return;
+  }
+  try {
+    await fb.updatePassword(user, nova);
+    // Remover flag mustChangePassword no Firestore
+    var emailKey=user.email.replace(/[^a-zA-Z0-9]/g,'_');
+    await fb.setDoc(fb.doc(fb.db,'usuarios',emailKey),{mustChangePassword:false},{merge:true});
+    esconderTrocaSenha();
+    // Entrar no app
+    var pendUser=window._pendingUser||user;
+    mostrarAppComPerfil(pendUser);
+  } catch(e){
+    var msg='Erro ao salvar senha: '+e.message;
+    if(e.code==='auth/requires-recent-login') msg='Por segurança, faca login novamente antes de trocar a senha.';
+    erro.style.display='block';erro.textContent=msg;
+    btn.textContent='Salvar e entrar'; btn.disabled=false;
+  }
+}
+
+// ==================== CREDENCIAIS COPIÁVEIS ====================
+var _ultimasCredenciais='';
+
+function copiarCredenciais(){
+  if(!_ultimasCredenciais) return;
+  navigator.clipboard.writeText(_ultimasCredenciais).then(function(){
+    var btn=document.querySelector('.cred-copy-btn');
+    if(btn){btn.textContent='✓ Copiado!'; setTimeout(function(){btn.textContent='Copiar mensagem';},2000);}
+  }).catch(function(){
+    var ta=document.createElement('textarea');
+    ta.value=_ultimasCredenciais; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    var btn=document.querySelector('.cred-copy-btn');
+    if(btn){btn.textContent='✓ Copiado!'; setTimeout(function(){btn.textContent='Copiar mensagem';},2000);}
+  });
+}
+
+function gerarSenhaTemp(){
+  var chars='ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+  var senha='';
+  for(var i=0;i<12;i++) senha+=chars.charAt(Math.floor(Math.random()*chars.length));
+  return senha;
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
