@@ -993,17 +993,26 @@ function buildLeadCard(l,i){
   var totalMrr = l.mrrServ + l.mrrBi;
   var totalComb = (l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
   var isPago = l.status==='Vendido' && (l.pago==='Pago'||l.pago==='Ag pagamento'||l.pago==='Atrasado');
+
+  // Cor do status de pagamento
+  var pagoColor = l.pago==='Pago' ? '#1baf7a' : l.pago==='Atrasado' ? '#e34948' : 'rgba(255,255,255,.45)';
+  var pagoLabel = l.pago==='Pago' ? '✓ Pago' : l.pago==='Atrasado' ? '⚠ Atrasado' : l.pago==='Ag pagamento' ? 'Ag pagamento' : '';
+
   if(isPago && totalComb > 0){
-    // Mostrar total combinado com breakdown
     var partes = [];
     if(totalMrr > 0) partes.push(fmt(totalMrr)+'/mes');
     if((l.produto||0) > 0) partes.push('Prod: '+fmt(l.produto));
     if((l.evento||0) > 0) partes.push('Ev: '+fmt(l.evento));
     if((l.impl||0) > 0) partes.push('Impl: '+fmt(l.impl));
     if((l.projetoPersonalizado||0) > 0) partes.push('Proj: '+fmt(l.projetoPersonalizado));
-    mrr.textContent = partes.join(' · ');
+    if(pagoLabel) partes.push('<span style="color:'+pagoColor+';font-weight:600">'+pagoLabel+'</span>');
+    mrr.innerHTML = partes.join(' · ');
   } else if(totalMrr > 0){
-    mrr.textContent = fmt(totalMrr)+'/mes';
+    var txt = fmt(totalMrr)+'/mes';
+    if(pagoLabel && l.status==='Vendido') txt += ' · <span style="color:'+pagoColor+';font-weight:600">'+pagoLabel+'</span>';
+    mrr.innerHTML = txt;
+  } else if(l.status==='Vendido' && pagoLabel){
+    mrr.innerHTML = '<span style="color:'+pagoColor+';font-weight:600">'+pagoLabel+'</span>';
   }
 
   var chev=document.createElement('span');
