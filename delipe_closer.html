@@ -469,7 +469,8 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
         <option value="Realizada/Avancou">Realizada/Avancou</option>
         <option value="Realizada/Nao avancou">Realizada/Nao avancou</option>
         <option value="Venda em ligacao">Venda em ligacao</option>
-        <option value="No-show">No-show</option>
+        <option value="Inicial No-show">Inicial No-show</option>
+        <option value="Proposta No-show">Proposta No-show</option>
         <option value="Cancelada">Cancelada</option>
         <option value="Aguardando nova data">Aguardando nova data</option>
       </select>
@@ -760,8 +761,8 @@ var SERVICOS = [
   'Diagnostico M&A','Pacote de Eventos','Diagnostico de Marketing'
 ];
 var CARGOS   = ['CEO','Dono','Diretor','Gerente','Analista','TI','Outro'];
-var STATUS_REUNIAO_INICIAL  = ['—','Realizada/Avancou','Realizada/Nao avancou','Venda em ligacao','No-show','Cancelada','Aguardando nova data'];
-var STATUS_REUNIAO_PROPOSTA = ['—','Realizada','Venda em ligacao','No-show','Cancelada','Aguardando nova data'];
+var STATUS_REUNIAO_INICIAL  = ['—','Realizada/Avancou','Realizada/Nao avancou','Venda em ligacao','Inicial No-show','Cancelada','Aguardando nova data'];
+var STATUS_REUNIAO_PROPOSTA = ['—','Realizada','Venda em ligacao','Proposta No-show','Cancelada','Aguardando nova data'];
 var STATUS_REUNIAO = STATUS_REUNIAO_PROPOSTA; // alias para followup
 var STATUS_LEAD    = ['Em andamento','Vendido','Nao avancou','Em negociacao','Nao convertido'];
 var QUALIFICACOES  = ['Qualificado+','Qualificado','Desqualificado','Nao e provedor'];
@@ -919,10 +920,17 @@ function renderLeads(){
   var fQual    = (document.getElementById('filtro-qual')    || {}).value || '';
 
   var filtrados = leads.filter(function(l){
-    if(fStatus  && l.status        !== fStatus)  return false;
-    if(fInicial && l.statusInicial !== fInicial) return false;
-    if(fCanal   && l.canal         !== fCanal)   return false;
-    if(fQual    && l.qualificacao  !== fQual)    return false;
+    if(fStatus  && l.status !== fStatus) return false;
+    if(fCanal   && l.canal  !== fCanal)  return false;
+    if(fQual    && l.qualificacao !== fQual) return false;
+    if(fInicial){
+      // Proposta No-show filtra por statusProposta, resto por statusInicial
+      if(fInicial === 'Proposta No-show'){
+        if(l.statusProposta !== 'Proposta No-show') return false;
+      } else {
+        if(l.statusInicial !== fInicial) return false;
+      }
+    }
     return true;
   });
 
@@ -1278,7 +1286,7 @@ function getMetrics(){
     if(l.statusInicial==='Realizada') m.inicialReal++;
     if(l.statusProposta==='Realizada') m.propostaReal++;
     if(l.statusFollowup==='Realizada') m.followReal++;
-    if(l.statusInicial==='No-show'||l.statusProposta==='No-show') m.noshow++;
+    if(l.statusInicial==='Inicial No-show'||l.statusProposta==='Proposta No-show') m.noshow++;
     if(l.contrato==='Assinado') m.contratosAssin++;
     if(l.pago==='Pago') m.pagos++;
     if(l.qualificacao==='Qualificado+') m.qualp++;
@@ -2132,7 +2140,7 @@ function recalcSdr(){
 
   var fg = document.getElementById('sdr-funil-grid');
   if(fg){
-    var noshow = sdrLeads.filter(function(l){ return l.statusInicial==='No-show'; }).length;
+    var noshow = sdrLeads.filter(function(l){ return l.statusInicial==='Inicial No-show'; }).length;
     var conv   = totalLeads>0?(vendidos.length/totalLeads*100).toFixed(0)+'%':'0%';
     fg.innerHTML =
       mc('Leads captados',totalLeads,'','') +
@@ -2815,7 +2823,7 @@ async function carregarTrimestre(){
         totalLeads++;
         if(l.statusInicial==='Realizada'||l.statusInicial==='Venda em ligacao') totalIniciais++;
         if(l.statusProposta==='Realizada'||l.statusProposta==='Venda em ligacao') totalPropostas++;
-        if(l.statusInicial==='No-show'||l.statusProposta==='No-show') totalNoShow++;
+        if(l.statusInicial==='Inicial No-show'||l.statusProposta==='Proposta No-show') totalNoShow++;
         if(l.status==='Vendido'){
           totalVendidos++;
           totalMrr+=l.mrrServ||0;
