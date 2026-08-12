@@ -305,6 +305,30 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 .chpw-erro{font-size:12px;color:#e34948;margin-top:8px;display:none;text-align:center}
 .chpw-req{font-size:11px;color:rgba(255,255,255,.3);text-align:left;margin-bottom:12px;line-height:1.6}
 
+/* HOME */
+.home-meta-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:16px;padding:1.4rem 1.6rem;position:relative;overflow:hidden}
+.home-meta-card .hmc-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.home-meta-card .hmc-meta{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:14px}
+.home-meta-card .hmc-title{font-size:22px;font-weight:700;color:#fff;margin-bottom:4px}
+.home-meta-card .hmc-sub{font-size:12px;color:rgba(255,255,255,.35);margin-bottom:14px}
+.hmc-bar-wrap{background:rgba(255,255,255,.08);border-radius:6px;height:8px;margin-bottom:8px;overflow:hidden}
+.hmc-bar{height:8px;border-radius:6px;transition:width .5s}
+.hmc-bar-vendido{background:linear-gradient(90deg,#ff6b00,#ff9940)}
+.hmc-bar-pago{background:linear-gradient(90deg,#1baf7a,#22d3a0)}
+.hmc-pct-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:12px}
+.hmc-extra-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:12px;padding:1rem 1.2rem}
+.hmc-extra-card .hec-lbl{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px}
+.hmc-extra-card .hec-val{font-size:18px;font-weight:700;color:#fff}
+.hmc-extra-card .hec-sub{font-size:11px;color:rgba(255,255,255,.3);margin-top:2px}
+.home-time-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid rgba(255,255,255,.06)}
+.home-time-row:last-child{border-bottom:none}
+.home-time-rank{width:22px;font-size:13px;font-weight:700;color:rgba(255,255,255,.3);text-align:center;flex-shrink:0}
+.home-time-rank.top1{color:#ffd700}
+.home-time-rank.top2{color:#c0c0c0}
+.home-time-rank.top3{color:#cd7f32}
+.home-time-name{flex:1;font-size:13px;color:#fff;font-weight:500}
+.home-time-pct{font-size:12px;font-weight:600;padding:3px 8px;border-radius:8px}
+
 /* CREDENTIAL MESSAGE CARD */
 .cred-card{background:rgba(255,107,0,.08);border:.5px solid rgba(255,107,0,.25);border-radius:12px;padding:14px 16px;margin-top:12px;display:none}
 .cred-card.active{display:block}
@@ -519,7 +543,8 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 </div>
 
 <div class="tabs" id="tabs-closer">
-  <button class="tab active" onclick="showTab('funil')">Funil de Leads</button>
+  <button class="tab active" onclick="showTab('home');carregarHome()">Home</button>
+  <button class="tab" onclick="showTab('funil')">Funil de Leads</button>
   <button class="tab" onclick="showTab('metricas')">Metricas</button>
   <button class="tab" onclick="showTab('comissao')">Comissao</button>
   <button class="tab" onclick="showTab('trimestre');carregarTrimestre()">Trimestre</button>
@@ -532,7 +557,40 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 </div>
 
 <!-- ===== FUNIL ===== -->
-<div id="tab-funil" class="tab-content active">
+<div id="tab-home" class="tab-content active">
+  <div class="card" id="home-boas-vindas" style="text-align:center;padding:2rem 1.5rem 1.5rem">
+    <div style="font-size:28px;font-weight:700;color:#fff;margin-bottom:4px">Bem-vindo, <span id="home-nome" style="color:#ff6b00">—</span></div>
+    <div style="font-size:13px;color:rgba(255,255,255,.35);margin-bottom:1.4rem" id="home-subtitulo">Comercial Delipe</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <div id="home-toggle-mes" onclick="homeSetView('mes')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#ff6b00;color:#fff;border:none">Mês atual</div>
+      <div id="home-toggle-tri" onclick="homeSetView('tri')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);border:none">Trimestre</div>
+    </div>
+  </div>
+
+  <div id="home-admin-bar" style="display:none">
+    <div class="card" style="padding:1rem 1.5rem;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em">Visualizando:</span>
+      <div id="home-view-time" onclick="homeSetUserView('time')" style="padding:5px 14px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;background:#ff6b00;color:#fff">Time todo</div>
+      <div id="home-view-eu" onclick="homeSetUserView('eu')" style="padding:5px 14px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5)">Meus dados</div>
+    </div>
+  </div>
+
+  <div id="home-loading" style="text-align:center;padding:2rem;font-size:13px;color:rgba(255,255,255,.35)">Carregando...</div>
+
+  <div id="home-content" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px" id="home-cards-meta"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px" id="home-cards-extra"></div>
+  </div>
+
+  <div id="home-time-grid" style="display:none">
+    <div class="card" style="padding:1rem 1.5rem">
+      <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Ranking do time</div>
+      <div id="home-time-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-funil" class="tab-content">
   <!-- campos internos ocultos - usados por getMesAno() e atualizarNome() -->
   <input type="hidden" id="nome-closer">
   <input type="hidden" id="mes-ref">
@@ -670,6 +728,30 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 </div>
 
 <div id="tab-config" class="tab-content">
+  <div class="card" style="padding:1.5rem">
+    <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px">Minhas metas</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div>
+        <div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:6px">Meta mensal (Total Combinado)</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;color:rgba(255,255,255,.4)">R$</span>
+          <input type="number" id="meta-mensal-input" placeholder="100000" min="0" step="1000"
+            style="flex:1;padding:9px 12px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.15);border-radius:8px;font-size:13px;color:#fff;font-family:Inter,sans-serif;outline:none">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:6px">Meta trimestral (Total Combinado)</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;color:rgba(255,255,255,.4)">R$</span>
+          <input type="number" id="meta-trimestral-input" placeholder="300000" min="0" step="1000"
+            style="flex:1;padding:9px 12px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.15);border-radius:8px;font-size:13px;color:#fff;font-family:Inter,sans-serif;outline:none">
+        </div>
+      </div>
+    </div>
+    <button onclick="salvarMinhasMetas()" style="padding:9px 20px;background:#ff6b00;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">Salvar metas</button>
+    <div id="meta-feedback" style="font-size:12px;margin-top:8px;display:none"></div>
+  </div>
+
   <div class="card" style="padding:0">
     <details>
       <summary style="padding:1.5rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em">
@@ -902,10 +984,10 @@ function showTab(t){
   document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active');});
   document.querySelectorAll('.tab').forEach(function(e){e.classList.remove('active');});
   document.getElementById('tab-'+t).classList.add('active');
-  var tabs=['funil','metricas','comissao','config'];
+  var tabs=['home','funil','metricas','comissao','trimestre','config'];
   var idx=tabs.indexOf(t);
-  if(idx>=0) document.querySelectorAll('.tab')[idx].classList.add('active');
-  recalc();
+  if(idx>=0) document.querySelectorAll('#tabs-closer .tab')[idx].classList.add('active');
+  if(t!=='home') recalc();
 }
 
 // ---- LEAD MODEL ----
@@ -2451,6 +2533,7 @@ function mostrarApp(user){
       atualizarNome();
     }
     setTimeout(carregarDadosIniciais, 500);
+    setTimeout(function(){ carregarHome(); }, 800);
   } else if(isSdr){
     document.getElementById('admin-bar').classList.remove('visible');
     document.getElementById('admin-only-config').classList.remove('visible');
@@ -2476,6 +2559,7 @@ function mostrarApp(user){
       atualizarNome();
     }
     setTimeout(carregarDadosIniciais, 500);
+    setTimeout(function(){ carregarHome(); }, 800);
   }
 }
 
@@ -3055,6 +3139,219 @@ function gerarSenhaTemp(){
   var senha='';
   for(var i=0;i<12;i++) senha+=chars.charAt(Math.floor(Math.random()*chars.length));
   return senha;
+}
+
+
+// ==================== HOME ====================
+var _homeView = 'mes';       // 'mes' | 'tri'
+var _homeUserView = 'eu';    // 'eu' | 'time'  (admin only)
+
+function homeSetView(v){
+  _homeView = v;
+  document.getElementById('home-toggle-mes').style.background = v==='mes'?'#ff6b00':'rgba(255,255,255,.08)';
+  document.getElementById('home-toggle-mes').style.color = v==='mes'?'#fff':'rgba(255,255,255,.5)';
+  document.getElementById('home-toggle-tri').style.background = v==='tri'?'#ff6b00':'rgba(255,255,255,.08)';
+  document.getElementById('home-toggle-tri').style.color = v==='tri'?'#fff':'rgba(255,255,255,.5)';
+  carregarHome();
+}
+
+function homeSetUserView(v){
+  _homeUserView = v;
+  document.getElementById('home-view-eu').style.background = v==='eu'?'#ff6b00':'rgba(255,255,255,.08)';
+  document.getElementById('home-view-eu').style.color = v==='eu'?'#fff':'rgba(255,255,255,.5)';
+  document.getElementById('home-view-time').style.background = v==='time'?'#ff6b00':'rgba(255,255,255,.08)';
+  document.getElementById('home-view-time').style.color = v==='time'?'#fff':'rgba(255,255,255,.5)';
+  document.getElementById('home-time-grid').style.display = v==='time'?'block':'none';
+  document.getElementById('home-content').style.display = v==='eu'?'block':'none';
+  if(v==='time') carregarHomeTime();
+}
+
+function _homeFmt(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function _homePct(val,meta){ return meta>0?Math.min(100,Math.round(val/meta*100)):0; }
+function _barColor(pct){ return pct>=100?'#1baf7a':pct>=70?'#ff9940':'#ff6b00'; }
+
+function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
+  var pctVend = _homePct(totalComb, meta);
+  var pctPago = _homePct(totalPago, meta);
+  var faltaMeta = Math.max(0, meta - totalComb);
+  var cards = document.getElementById('home-cards-meta');
+  var extra = document.getElementById('home-cards-extra');
+
+  cards.innerHTML =
+    '<div class="home-meta-card">'
+    +'<div class="hmc-label">Meta '+labelPeriodo+'</div>'
+    +'<div class="hmc-meta">Referência: '+_homeF(meta)+'</div>'
+    +'<div class="hmc-title">'+_homeF(totalComb)+'</div>'
+    +'<div class="hmc-sub">Total combinado vendido</div>'
+    +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-vendido" style="width:'+pctVend+'%;background:'+_barColor(pctVend)+'"></div></div>'
+    +'<div class="hmc-pct-row"><span style="color:#ff9940;font-weight:700">'+pctVend+'% da meta vendido</span><span style="color:rgba(255,255,255,.3)">Faltam '+_homeF(faltaMeta)+'</span></div>'
+    +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-pago" style="width:'+pctPago+'%"></div></div>'
+    +'<div class="hmc-pct-row"><span style="color:#1baf7a;font-weight:700">'+pctPago+'% pago/ag. pagamento</span><span style="color:rgba(255,255,255,.3)">'+_homeF(totalPago)+' recebido</span></div>'
+    +'</div>';
+
+  extra.innerHTML =
+    '<div class="hmc-extra-card"><div class="hec-lbl">Vendido</div><div class="hec-val" style="color:#ff9940">'+_homeF(totalComb)+'</div><div class="hec-sub">Total combinado</div></div>'
+    +'<div class="hmc-extra-card"><div class="hec-lbl">Pago / Ag. pagamento</div><div class="hec-val" style="color:#1baf7a">'+_homeF(totalPago)+'</div><div class="hec-sub">'+_homePct(totalPago,totalComb)+'% do vendido recebido</div></div>'
+    +'<div class="hmc-extra-card"><div class="hec-lbl">Falta para meta</div><div class="hec-val" style="color:'+(faltaMeta===0?'#1baf7a':'#e34948')+'">'+_homeF(faltaMeta)+'</div><div class="hec-sub">'+(faltaMeta===0?'Meta atingida!':pctVend+'% concluido')+'</div></div>';
+
+  document.getElementById('home-loading').style.display='none';
+  document.getElementById('home-content').style.display='block';
+}
+
+function _homeF(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+
+async function carregarHome(){
+  if(!currentUser || !window._fb) return;
+  document.getElementById('home-loading').style.display='block';
+  document.getElementById('home-content').style.display='none';
+  document.getElementById('home-time-grid').style.display='none';
+
+  // Mostrar barra admin
+  if(isAdmin){
+    document.getElementById('home-admin-bar').style.display='block';
+  }
+
+  // Nome
+  var nome = currentUser.displayName || currentUser.nome || currentUser.email.split('@')[0];
+  document.getElementById('home-nome').textContent = nome.split(' ')[0];
+
+  // Buscar metas do usuario
+  var fb = window._fb;
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var metaMensal = 100000, metaTrimestral = 300000;
+  try {
+    var snapMeta = await fb.getDoc(fb.doc(fb.db,'usuarios',emailKey));
+    if(snapMeta.exists()){
+      var d = snapMeta.data();
+      metaMensal     = d.metaMensal     || 100000;
+      metaTrimestral = d.metaTrimestral || 300000;
+      // Pre-preencher inputs de config
+      var inpM = document.getElementById('meta-mensal-input');
+      var inpT = document.getElementById('meta-trimestral-input');
+      if(inpM && !inpM.value) inpM.value = metaMensal;
+      if(inpT && !inpT.value) inpT.value = metaTrimestral;
+    }
+  } catch(e){ console.warn('meta load err', e); }
+
+  var ma = getMesAno();
+
+  if(_homeView === 'mes'){
+    document.getElementById('home-subtitulo').textContent = ma.mes+' de '+ma.ano;
+    // Usar leads ja carregados
+    var totalComb = 0, totalPago = 0;
+    leads.forEach(function(l){
+      if(l.status==='Vendido'){
+        var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+        totalComb += comb;
+        if(l.pago==='Pago'||l.pago==='Ag pagamento') totalPago += comb;
+      }
+    });
+    _renderHomeCards(totalComb, totalPago, metaMensal, 'mensal');
+
+  } else {
+    // Trimestre — carregar 3 meses
+    var tri = document.getElementById('tri-select') ? document.getElementById('tri-select').value : 'Q1';
+    var ano = ma.ano;
+    var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var mesNum = MESES_PT.indexOf(ma.mes) + 1;
+    var triAtual = mesNum<=3?'Q1':mesNum<=6?'Q2':mesNum<=9?'Q3':'Q4';
+    var triMeses = {Q1:['Janeiro','Fevereiro','Marco'],Q2:['Abril','Maio','Junho'],Q3:['Julho','Agosto','Setembro'],Q4:['Outubro','Novembro','Dezembro']};
+    var mesesTri = triMeses[triAtual];
+    document.getElementById('home-subtitulo').textContent = triAtual+' / '+ano+' ('+mesesTri[0]+' - '+mesesTri[2]+')';
+
+    var totalCombTri = 0, totalPagoTri = 0;
+    try {
+      for(var i=0;i<mesesTri.length;i++){
+        var chave = emailKey+'__'+mesesTri[i]+'_'+ano;
+        var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
+        if(snap.exists() && snap.data().leads){
+          snap.data().leads.forEach(function(l){
+            if(l.status==='Vendido'){
+              var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+              totalCombTri += comb;
+              if(l.pago==='Pago'||l.pago==='Ag pagamento') totalPagoTri += comb;
+            }
+          });
+        }
+      }
+    } catch(e){ console.warn('tri load err', e); }
+    _renderHomeCards(totalCombTri, totalPagoTri, metaTrimestral, 'trimestral');
+  }
+
+  if(isAdmin && _homeUserView==='time'){
+    document.getElementById('home-time-grid').style.display='block';
+    carregarHomeTime();
+  }
+}
+
+async function carregarHomeTime(){
+  var fb = window._fb;
+  var ma = getMesAno();
+  // Buscar todos os usuarios closers
+  try {
+    var snapU = await fb.getDocs(fb.collection(fb.db,'usuarios'));
+    var closers = [];
+    snapU.forEach(function(d){
+      var u = d.data();
+      if(u.email && u.perfil !== 'sdr') closers.push(u);
+    });
+
+    var resultados = [];
+    for(var i=0;i<closers.length;i++){
+      var u = closers[i];
+      var emailKey = u.email.replace(/[^a-zA-Z0-9]/g,'_');
+      var meta = u.metaMensal || 100000;
+      var totalComb = 0;
+      try {
+        var chave = _homeView==='mes'
+          ? emailKey+'__'+ma.mes+'_'+ma.ano
+          : null; // trimestre simplificado
+        if(chave){
+          var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
+          if(snap.exists() && snap.data().leads){
+            snap.data().leads.forEach(function(l){
+              if(l.status==='Vendido'){
+                totalComb += (l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+              }
+            });
+          }
+        }
+      } catch(e){}
+      resultados.push({nome:u.nome||u.email.split('@')[0], totalComb:totalComb, meta:meta, pct:meta>0?Math.round(totalComb/meta*100):0});
+    }
+
+    resultados.sort(function(a,b){return b.totalComb-a.totalComb;});
+    var list = document.getElementById('home-time-list');
+    if(!list) return;
+    list.innerHTML = resultados.map(function(r,i){
+      var cor = r.pct>=100?'#1baf7a':r.pct>=70?'#ff9940':'#e34948';
+      var rankCls = i===0?'top1':i===1?'top2':i===2?'top3':'';
+      return '<div class="home-time-row">'
+        +'<div class="home-time-rank '+rankCls+'">'+(i+1)+'</div>'
+        +'<div class="home-time-name">'+r.nome+'</div>'
+        +'<div style="font-size:12px;color:rgba(255,255,255,.4);margin-right:8px">'+_homeF(r.totalComb)+'</div>'
+        +'<div class="home-time-pct" style="background:'+cor+'22;color:'+cor+'">'+r.pct+'%</div>'
+        +'</div>';
+    }).join('');
+  } catch(e){ console.warn('home time err',e); }
+}
+
+async function salvarMinhasMetas(){
+  if(!currentUser || !window._fb) return;
+  var metaMensal     = parseFloat(document.getElementById('meta-mensal-input').value) || 100000;
+  var metaTrimestral = parseFloat(document.getElementById('meta-trimestral-input').value) || 300000;
+  var fb2 = document.getElementById('meta-feedback');
+  try {
+    var fb = window._fb;
+    var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+    await fb.setDoc(fb.doc(fb.db,'usuarios',emailKey),{metaMensal:metaMensal,metaTrimestral:metaTrimestral},{merge:true});
+    fb2.style.display='block';fb2.style.color='#1baf7a';
+    fb2.textContent='Metas salvas com sucesso!';
+    setTimeout(function(){fb2.style.display='none';},3000);
+  } catch(e){
+    fb2.style.display='block';fb2.style.color='#e34948';
+    fb2.textContent='Erro ao salvar: '+e.message;
+  }
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
