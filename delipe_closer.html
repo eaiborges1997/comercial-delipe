@@ -2854,22 +2854,7 @@ async function convidarUsuario(){
       },{merge:true});
       // Montar mensagem de credenciais
       var url = window.location.href.split('?')[0];
-      var msg = 'Olá, '+nome+'!
-
-Seu acesso ao Sistema Comercial Delipe foi criado.
-
-'
-              + '🔗 Link: '+url+'
-'
-              + '📧 Login: '+email+'
-'
-              + '🔑 Senha temporária: '+senhaTemp+'
-
-'
-              + 'No primeiro acesso você será obrigado(a) a criar uma senha pessoal.
-
-'
-              + 'Qualquer dúvida, fale com o administrador.';
+      var msg = 'Ola, '+nome+'!\n\nSeu acesso ao Sistema Comercial Delipe foi criado.\n\nLink: '+url+'\nLogin: '+email+'\nSenha temporaria: '+senhaTemp+'\n\nNo primeiro acesso voce sera obrigado(a) a criar uma senha pessoal.\n\nQualquer duvida, fale com o administrador.';
       _ultimasCredenciais = msg;
       document.getElementById('cred-card-body').textContent = msg;
       credCard.classList.add('active');
