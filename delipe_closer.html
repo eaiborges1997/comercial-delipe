@@ -3206,19 +3206,27 @@ function _isRecorrencia(l){
 
 function _calcCampanha(leadsArr){
   var proj = 0, conf = 0, mrrProj = 0, mrrConf = 0;
+  console.log('[CAMPANHA] Total leads recebidos:', leadsArr.length);
   leadsArr.forEach(function(l){
-    if(!_isRecorrencia(l)) return;
+    console.log('[CAMPANHA] Lead:', l.empresa, '| status:', l.status, '| pago:', l.pago, '| mrrServ:', l.mrrServ, '| mrrBi:', l.mrrBi);
+    if(!_isRecorrencia(l)){
+      console.log('[CAMPANHA] -> NAO conta (nao e recorrencia)');
+      return;
+    }
     var pago = l.pago || '';
     var mrr = (l.mrrServ||0) + (l.mrrBi||0);
     if(pago === 'Ag pagamento' || pago === 'Pago'){
       proj++;
       mrrProj += mrr;
+      console.log('[CAMPANHA] -> PROJ++ empresa:', l.empresa, 'pago:', pago, 'mrr:', mrr);
     }
     if(pago === 'Pago'){
       conf++;
       mrrConf += mrr;
+      console.log('[CAMPANHA] -> CONF++ empresa:', l.empresa, 'mrr:', mrr);
     }
   });
+  console.log('[CAMPANHA] RESULTADO: proj='+proj+' conf='+conf);
   return {proj:proj, conf:conf, mrrProj:mrrProj, mrrConf:mrrConf};
 }
 
@@ -3430,35 +3438,26 @@ async function carregarHome(){
     var totalComb = 0, totalPago = 0;
     var leadsMulti = [];
 
-    // Se so um mes e e o mes atual, usar leads ja carregados
-    if(mesesSel.length === 1 && mesesSel[0] === ma.mes){
-      leads.forEach(function(l){
-        if(l.status==='Vendido'){
-          var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
-          totalComb += comb;
-          if(l.pago==='Pago') totalPago += comb;
+    // Sempre carregar do Firestore para garantir o mes correto
+    console.log('[HOME] emailKey:', emailKey, '| mesesSel:', mesesSel, '| ano:', ma.ano);
+    for(var mi=0; mi<mesesSel.length; mi++){
+      var chaveM = emailKey+'__'+mesesSel[mi]+'_'+ma.ano;
+      console.log('[HOME] Buscando chave:', chaveM);
+      try {
+        var snapM = await fb.getDoc(fb.doc(fb.db,'leads',chaveM));
+        console.log('[HOME] Doc existe:', snapM.exists(), '| leads count:', snapM.exists() && snapM.data().leads ? snapM.data().leads.length : 0);
+        if(snapM.exists() && snapM.data().leads){
+          var leadsM = snapM.data().leads;
+          leadsMulti = leadsMulti.concat(leadsM);
+          leadsM.forEach(function(l){
+            if(l.status==='Vendido'){
+              var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+              totalComb += comb;
+              if(l.pago==='Pago') totalPago += comb;
+            }
+          });
         }
-      });
-      leadsMulti = leads;
-    } else {
-      // Carregar cada mes selecionado do Firestore
-      for(var mi=0; mi<mesesSel.length; mi++){
-        var chaveM = emailKey+'__'+mesesSel[mi]+'_'+ma.ano;
-        try {
-          var snapM = await fb.getDoc(fb.doc(fb.db,'leads',chaveM));
-          if(snapM.exists() && snapM.data().leads){
-            var leadsM = snapM.data().leads;
-            leadsMulti = leadsMulti.concat(leadsM);
-            leadsM.forEach(function(l){
-              if(l.status==='Vendido'){
-                var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
-                totalComb += comb;
-                if(l.pago==='Pago') totalPago += comb;
-              }
-            });
-          }
-        } catch(e){ console.warn('load mes err',mesesSel[mi],e); }
-      }
+      } catch(e){ console.warn('load mes err',mesesSel[mi],e); }
     }
 
     // Meta: proporcional ao numero de meses selecionados
