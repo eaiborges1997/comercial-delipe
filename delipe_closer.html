@@ -1425,13 +1425,15 @@ function recalc(){
   var c1bonus     = c1atingida ? 2000 : 0;
 
   // Campanha 2: 80k total -> BI vira fixo 500/BI, 4+ BIs -> 700/BI
+  // O valor do BI ja entra em calcComissao via comBi = qtdBi * valorBI
+  // c2bonus = 0 para nao duplicar — o bonus esta embutido na comissao do canal
   var totalGerado = m.totalCombinado;
   var c2ativa     = totalGerado >= 80000;
   var qtdBiVend   = leadsVendidos.filter(function(l){return l.mrrBi>0;}).length;
   var qtdBiPago   = leadsPagos.filter(function(l){return l.mrrBi>0;}).length;
   var valorPorBi  = c2ativa ? (qtdBiVend>=4 ? 700 : 500) : 0;
-  var c2bonus     = c2ativa ? qtdBiVend * valorPorBi : 0;
-  var c2bonusPago = c2ativa ? qtdBiPago * valorPorBi : 0;
+  var c2bonus     = 0; // ja contabilizado dentro de calcComissao
+  var c2bonusPago = 0; // ja contabilizado dentro de calcComissao
 
   // Render campanhas
   var cw = document.getElementById('campanhas-wrap');
