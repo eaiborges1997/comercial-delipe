@@ -291,7 +291,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 .login-toggle-link:hover{color:#ff6b00}
 
 /* CHANGE PASSWORD SCREEN */
-#change-password-screen{position:fixed;inset:0;background:#0d0720;z-index:9998;display:none;align-items:center;justify-content:center;flex-direction:column;overflow:hidden}
+#change-password-screen{position:fixed;inset:0;background:#0d0720;z-index:10000;display:none;align-items:center;justify-content:center;flex-direction:column;overflow:hidden}
 #change-password-screen.active{display:flex}
 .chpw-box{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:20px;padding:2.5rem 2.2rem;width:360px;position:relative;z-index:2;text-align:center}
 .chpw-icon{font-size:36px;margin-bottom:1rem}
@@ -2923,13 +2923,23 @@ function fazerLoginEmail(){
   // Bloquear onAuthStateChanged enquanto gerenciamos o login aqui
   window._handlingEmailLogin = true;
   var fb=window._fb;
+  // Timeout de seguranca: se nao resolver em 10s, desbloquear botao
+  var loginTimeout = setTimeout(function(){
+    btn.textContent='Entrar'; btn.disabled=false;
+    window._handlingEmailLogin = false;
+    erro.style.display='block';
+    erro.textContent='Tempo esgotado. Verifique sua conexao e tente novamente.';
+  }, 10000);
+
   fb.signInWithEmailAndPassword(fb.auth, email, senha)
     .then(function(result){
       var user=result.user;
       var emailKey=user.email.replace(/[^a-zA-Z0-9]/g,'_');
       fb.getDoc(fb.doc(fb.db,'usuarios',emailKey)).then(function(snap){
+        clearTimeout(loginTimeout);
         if(!snap.exists()){
-          erro.style.display='block';erro.textContent='Conta nao autorizada. Contate o admin.';
+          erro.style.display='block';
+          erro.textContent='Email nao cadastrado no sistema. Contate o admin (email: '+user.email+').';
           fb.signOut(fb.auth);
           btn.textContent='Entrar'; btn.disabled=false;
           window._handlingEmailLogin = false;
@@ -2946,12 +2956,17 @@ function fazerLoginEmail(){
           mostrarAppComPerfil(user);
         }
       }).catch(function(e){
-        erro.style.display='block';erro.textContent='Erro ao verificar conta: '+e.message;
+        clearTimeout(loginTimeout);
+        var errMsg='Erro ao verificar conta.';
+        if(e.code==='permission-denied') errMsg='Sem permissao no banco de dados. Verifique as regras do Firestore.';
+        else errMsg='Erro: '+e.message;
+        erro.style.display='block';erro.textContent=errMsg;
         btn.textContent='Entrar'; btn.disabled=false;
         window._handlingEmailLogin = false;
       });
     })
     .catch(function(e){
+      clearTimeout(loginTimeout);
       var msg='Email ou senha incorretos.';
       if(e.code==='auth/too-many-requests') msg='Muitas tentativas. Tente mais tarde.';
       if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential') msg='Email ou senha incorretos.';
@@ -2964,11 +2979,19 @@ function fazerLoginEmail(){
 
 // ==================== TROCA DE SENHA (PRIMEIRO ACESSO) ====================
 function mostrarTrocaSenha(){
+  // Esconder tela de login completamente
+  var ls = document.getElementById('login-screen');
+  if(ls) ls.classList.add('hidden');
+  // Resetar botao de login (caso esteja "Entrando...")
+  var btn = document.getElementById('btn-email-login');
+  if(btn){ btn.textContent='Entrar'; btn.disabled=false; }
+  // Mostrar tela de troca de senha
   document.getElementById('change-password-screen').classList.add('active');
 }
 
 function esconderTrocaSenha(){
   document.getElementById('change-password-screen').classList.remove('active');
+  // login-screen permanece hidden (usuario ja vai entrar no app)
 }
 
 async function salvarNovaSenha(){
