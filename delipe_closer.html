@@ -2872,9 +2872,16 @@ addLead = function(){
 var _removeLeadOrig = removeLead;
 removeLead = function(id){
   _removeLeadOrig(id);
-  // Salvar imediatamente — sem delay, para garantir que o lead seja excluido
+  // Salvar imediatamente
   clearTimeout(saveTimeout);
-  salvarNoFirestore();
+  var chaveDebug = getLeadColecao();
+  console.log('[removeLead] salvando em chave:', chaveDebug, '| leads restantes:', leads.length);
+  salvarNoFirestore().then(function(){
+    console.log('[removeLead] salvo com sucesso. Leads no Firestore:', leads.length);
+  }).catch(function(e){
+    console.error('[removeLead] ERRO ao salvar:', e);
+    alert('Erro ao excluir: ' + e.message);
+  });
 };
 
 var _duplicarOrig = duplicarLead;
