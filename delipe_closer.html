@@ -412,7 +412,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   </div>
   <div class="admin-controls">
     <span class="closer-select-tag">Closer:</span>
-    <select id="admin-closer-select" onchange="adminTrocarCloser()">
+    <select id="admin-closer-select" onchange="adminTrocarCloser()" onfocus="if(this.options.length<=1) carregarUsuarios(true)">
       <option value="">-- Selecione --</option>
     </select>
     <button class="admin-controls btn-consolidado" onclick="adminVerConsolidado()">Ver consolidado do time</button>
@@ -2392,9 +2392,11 @@ function iniciarFirebaseAuth(){
         if(snap.exists()) user._perfil = snap.data().perfil||'closer';
         else user._perfil = SDR_EMAILS[user.email]?'sdr':(fb2.ADMINS.indexOf(user.email)>=0?'admin':'closer');
         mostrarAppComPerfil(user);
-        // Carregar lista de usuarios se for admin (apos mostrarApp definir isAdmin=true)
+        // Carregar lista de usuarios — tentar 3x para garantir que Firebase esteja pronto
         if(user._perfil==='admin' || fb2.ADMINS.indexOf(user.email)>=0){
-          setTimeout(function(){ carregarUsuarios(true); }, 400);
+          setTimeout(function(){ carregarUsuarios(true); }, 500);
+          setTimeout(function(){ carregarUsuarios(true); }, 1500);
+          setTimeout(function(){ carregarUsuarios(true); }, 3500);
         }
       }).catch(function(){ mostrarApp(user); });
     } else {
