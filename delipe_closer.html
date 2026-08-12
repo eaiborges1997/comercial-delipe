@@ -453,6 +453,43 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 
   <div class="card">
     <div class="sec">Leads do mes</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center">
+      <span style="font-size:11px;color:rgba(255,255,255,.35);font-weight:600;letter-spacing:.06em;text-transform:uppercase">Filtrar:</span>
+      <select id="filtro-status" onchange="renderLeads()" style="font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer">
+        <option value="">Todos os status</option>
+        <option value="Em andamento">Em andamento</option>
+        <option value="Em negociacao">Em negociacao</option>
+        <option value="Vendido">Vendido</option>
+        <option value="Nao avancou">Nao avancou</option>
+        <option value="Nao convertido">Nao convertido</option>
+      </select>
+      <select id="filtro-inicial" onchange="renderLeads()" style="font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer">
+        <option value="">Toda inicial</option>
+        <option value="Realizada/Avancou">Realizada/Avancou</option>
+        <option value="Realizada/Nao avancou">Realizada/Nao avancou</option>
+        <option value="Venda em ligacao">Venda em ligacao</option>
+        <option value="No-show">No-show</option>
+        <option value="Cancelada">Cancelada</option>
+        <option value="Aguardando nova data">Aguardando nova data</option>
+      </select>
+      <select id="filtro-canal" onchange="renderLeads()" style="font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer">
+        <option value="">Todos os canais</option>
+        <option value="Trafego Pago">Trafego Pago</option>
+        <option value="Evento">Evento</option>
+        <option value="SDR">SDR</option>
+        <option value="Base">Base</option>
+        <option value="Indicacao">Indicacao</option>
+      </select>
+      <select id="filtro-qual" onchange="renderLeads()" style="font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer">
+        <option value="">Toda qualificacao</option>
+        <option value="Qualificado+">Qualificado+</option>
+        <option value="Qualificado">Qualificado</option>
+        <option value="Desqualificado">Desqualificado</option>
+        <option value="Nao e provedor">Nao e provedor</option>
+      </select>
+      <button onclick="limparFiltros()" style="font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:6px;background:transparent;color:rgba(255,255,255,.4);font-family:Inter,sans-serif;cursor:pointer">✕ Limpar</button>
+      <span id="filtro-count" style="font-size:11px;color:rgba(255,255,255,.3);margin-left:4px"></span>
+    </div>
     <div class="lead-cards" id="lead-cards"></div>
     <button class="add-lead-btn" onclick="addLead()">+ Adicionar lead</button>
   </div>
@@ -859,6 +896,13 @@ function statusTag(s){
 function canalTag(c){ return '<span class="lead-canal-tag">'+c+'</span>'; }
 
 // ---- RENDER LEADS ----
+function limparFiltros(){
+  ['filtro-status','filtro-inicial','filtro-canal','filtro-qual'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  renderLeads();
+}
+
 function renderLeads(){
   var wrap=document.getElementById('lead-cards');
   wrap.innerHTML='';
@@ -866,7 +910,32 @@ function renderLeads(){
     wrap.innerHTML='<div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1.5rem">Nenhum lead cadastrado. Clique em "+ Adicionar lead" para comecar.</div>';
     recalc(); return;
   }
-  leads.forEach(function(l,i){ wrap.appendChild(buildLeadCard(l,i)); });
+
+  // Aplicar filtros
+  var fStatus  = (document.getElementById('filtro-status')  || {}).value || '';
+  var fInicial = (document.getElementById('filtro-inicial') || {}).value || '';
+  var fCanal   = (document.getElementById('filtro-canal')   || {}).value || '';
+  var fQual    = (document.getElementById('filtro-qual')    || {}).value || '';
+
+  var filtrados = leads.filter(function(l){
+    if(fStatus  && l.status        !== fStatus)  return false;
+    if(fInicial && l.statusInicial !== fInicial) return false;
+    if(fCanal   && l.canal         !== fCanal)   return false;
+    if(fQual    && l.qualificacao  !== fQual)    return false;
+    return true;
+  });
+
+  var cnt = document.getElementById('filtro-count');
+  if(cnt){
+    var temFiltro = fStatus||fInicial||fCanal||fQual;
+    cnt.textContent = temFiltro ? filtrados.length+' de '+leads.length+' leads' : '';
+  }
+
+  if(filtrados.length===0){
+    wrap.innerHTML='<div style="font-size:13px;color:rgba(255,255,255,.3);text-align:center;padding:1.5rem">Nenhum lead corresponde ao filtro.</div>';
+    recalc(); return;
+  }
+  filtrados.forEach(function(l,i){ wrap.appendChild(buildLeadCard(l,i)); });
   recalc();
 }
 
