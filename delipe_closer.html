@@ -590,19 +590,30 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
       <div id="home-toggle-mes" onclick="homeSetView('mes')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#ff6b00;color:#fff">Meses</div>
       <div id="home-toggle-tri" onclick="homeSetView('tri')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5)">Trimestre</div>
     </div>
-    <div id="home-meses-picker" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
-      <div class="home-mes-btn active" data-mes="Janeiro"   onclick="homeToggleMes(this)">Jan</div>
-      <div class="home-mes-btn" data-mes="Fevereiro"  onclick="homeToggleMes(this)">Fev</div>
-      <div class="home-mes-btn" data-mes="Marco"      onclick="homeToggleMes(this)">Mar</div>
-      <div class="home-mes-btn" data-mes="Abril"      onclick="homeToggleMes(this)">Abr</div>
-      <div class="home-mes-btn" data-mes="Maio"       onclick="homeToggleMes(this)">Mai</div>
-      <div class="home-mes-btn" data-mes="Junho"      onclick="homeToggleMes(this)">Jun</div>
-      <div class="home-mes-btn" data-mes="Julho"      onclick="homeToggleMes(this)">Jul</div>
-      <div class="home-mes-btn" data-mes="Agosto"     onclick="homeToggleMes(this)">Ago</div>
-      <div class="home-mes-btn" data-mes="Setembro"   onclick="homeToggleMes(this)">Set</div>
-      <div class="home-mes-btn" data-mes="Outubro"    onclick="homeToggleMes(this)">Out</div>
-      <div class="home-mes-btn" data-mes="Novembro"   onclick="homeToggleMes(this)">Nov</div>
-      <div class="home-mes-btn" data-mes="Dezembro"   onclick="homeToggleMes(this)">Dez</div>
+    <div id="home-meses-picker" style="display:none;margin-top:12px">
+      <div style="background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:14px;padding:14px 16px;display:inline-block;min-width:320px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em">Selecionar meses</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:rgba(255,255,255,.5)">
+            <input type="checkbox" id="home-todos-meses" onchange="homeToggleTodos(this)" style="accent-color:#ff6b00;width:14px;height:14px;cursor:pointer">
+            Todos
+          </label>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+          <div class="home-mes-btn" data-mes="Janeiro"   onclick="homeToggleMes(this)">Jan</div>
+          <div class="home-mes-btn" data-mes="Fevereiro" onclick="homeToggleMes(this)">Fev</div>
+          <div class="home-mes-btn" data-mes="Marco"     onclick="homeToggleMes(this)">Mar</div>
+          <div class="home-mes-btn" data-mes="Abril"     onclick="homeToggleMes(this)">Abr</div>
+          <div class="home-mes-btn" data-mes="Maio"      onclick="homeToggleMes(this)">Mai</div>
+          <div class="home-mes-btn" data-mes="Junho"     onclick="homeToggleMes(this)">Jun</div>
+          <div class="home-mes-btn" data-mes="Julho"     onclick="homeToggleMes(this)">Jul</div>
+          <div class="home-mes-btn" data-mes="Agosto"    onclick="homeToggleMes(this)">Ago</div>
+          <div class="home-mes-btn" data-mes="Setembro"  onclick="homeToggleMes(this)">Set</div>
+          <div class="home-mes-btn" data-mes="Outubro"   onclick="homeToggleMes(this)">Out</div>
+          <div class="home-mes-btn" data-mes="Novembro"  onclick="homeToggleMes(this)">Nov</div>
+          <div class="home-mes-btn" data-mes="Dezembro"  onclick="homeToggleMes(this)">Dez</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3263,15 +3274,15 @@ var _homeUserView = 'eu';    // 'eu' | 'time'  (admin only)
 var _homeSelectedMeses = [];  // populado ao iniciar com mes atual
 
 function _initHomeSelectedMeses(){
-  var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var ma = getMesAno();
   _homeSelectedMeses = [ma.mes];
-  // Marcar botao do mes atual como "current" e ativo, resto inactive
   document.querySelectorAll('.home-mes-btn').forEach(function(btn){
     var m = btn.dataset.mes;
     btn.classList.toggle('active', m === ma.mes);
     btn.classList.toggle('current', m === ma.mes);
   });
+  var cb = document.getElementById('home-todos-meses');
+  if(cb) cb.checked = false;
 }
 
 function homeToggleMes(btn){
@@ -3279,25 +3290,51 @@ function homeToggleMes(btn){
   var mes = btn.dataset.mes;
   var idx = _homeSelectedMeses.indexOf(mes);
   if(idx >= 0){
-    // Deselect — mas nao pode ficar zero
-    if(_homeSelectedMeses.length === 1) return;
+    if(_homeSelectedMeses.length === 1) return; // nao pode ficar zero
     _homeSelectedMeses.splice(idx, 1);
     btn.classList.remove('active');
   } else {
     _homeSelectedMeses.push(mes);
     btn.classList.add('active');
   }
+  // Sync checkbox "todos"
+  var cb = document.getElementById('home-todos-meses');
+  if(cb) cb.checked = _homeSelectedMeses.length === 12;
+  carregarHome();
+}
+
+function homeToggleTodos(cb){
+  var TODOS = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  if(cb.checked){
+    _homeSelectedMeses = TODOS.slice();
+    document.querySelectorAll('.home-mes-btn').forEach(function(b){ b.classList.add('active'); });
+  } else {
+    // Volta para o mes atual
+    _initHomeSelectedMeses();
+  }
   carregarHome();
 }
 
 function homeSetView(v){
-  _homeView = v;
   var picker = document.getElementById('home-meses-picker');
-  document.getElementById('home-toggle-mes').style.background = v==='mes'?'#ff6b00':'rgba(255,255,255,.08)';
-  document.getElementById('home-toggle-mes').style.color = v==='mes'?'#fff':'rgba(255,255,255,.5)';
-  document.getElementById('home-toggle-tri').style.background = v==='tri'?'#ff6b00':'rgba(255,255,255,.08)';
-  document.getElementById('home-toggle-tri').style.color = v==='tri'?'#fff':'rgba(255,255,255,.5)';
-  if(picker) picker.style.display = v==='mes'?'flex':'none';
+  if(v === 'mes'){
+    // Se ja estava em mes, toggle o picker (abre/fecha)
+    if(_homeView === 'mes'){
+      var isOpen = picker && picker.style.display !== 'none';
+      if(picker) picker.style.display = isOpen ? 'none' : 'block';
+      // Se fechou sem mudar selecao, nao recarregar
+      return;
+    }
+    _homeView = 'mes';
+    if(picker) picker.style.display = 'block';
+  } else {
+    _homeView = v;
+    if(picker) picker.style.display = 'none';
+  }
+  document.getElementById('home-toggle-mes').style.background = _homeView==='mes'?'#ff6b00':'rgba(255,255,255,.08)';
+  document.getElementById('home-toggle-mes').style.color = _homeView==='mes'?'#fff':'rgba(255,255,255,.5)';
+  document.getElementById('home-toggle-tri').style.background = _homeView==='tri'?'#ff6b00':'rgba(255,255,255,.08)';
+  document.getElementById('home-toggle-tri').style.color = _homeView==='tri'?'#fff':'rgba(255,255,255,.5)';
   carregarHome();
 }
 
