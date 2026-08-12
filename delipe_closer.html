@@ -2626,11 +2626,13 @@ async function salvarNoFirestore(){
     var fb = window._fb;
     var chave = getLeadColecao();
     if(!chave){ isSaving=false; return; }
-    // Salvar documento com todos os leads do mes
+    // Email correto: se admin vendo outro closer, usar email do closer
+    var emailSalvar = (isAdmin && window._viewingEmail) ? window._viewingEmail : currentUser.email;
+    var ma = getMesAno();
     await fb.setDoc(fb.doc(fb.db,'leads',chave),{
-      closer: currentUser.email,
-      mes: getMesAno().mes,
-      ano: getMesAno().ano,
+      closer: emailSalvar,
+      mes: ma.mes,
+      ano: ma.ano,
       leads: leads,
       updatedAt: Date.now()
     });
