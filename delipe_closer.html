@@ -3281,7 +3281,7 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-vendido" style="width:'+pctVend+'%;background:'+_barColor(pctVend)+'"></div></div>'
     +'<div class="hmc-pct-row"><span style="color:#ff9940;font-weight:700">'+pctVend+'% da meta vendido</span><span style="color:rgba(255,255,255,.3)">Faltam '+_homeF(faltaMeta)+'</span></div>'
     +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-pago" style="width:'+pctPago+'%"></div></div>'
-    +'<div class="hmc-pct-row"><span style="color:#1baf7a;font-weight:700">'+pctPago+'% pago/ag. pagamento</span><span style="color:rgba(255,255,255,.3)">'+_homeF(totalPago)+' recebido</span></div>'
+    +'<div class="hmc-pct-row"><span style="color:#1baf7a;font-weight:700">'+pctPago+'% pago</span><span style="color:rgba(255,255,255,.3)">'+_homeF(totalPago)+' recebido</span></div>'
     +'</div>';
 
   extra.innerHTML =
@@ -3338,7 +3338,7 @@ async function carregarHome(){
       if(l.status==='Vendido'){
         var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
         totalComb += comb;
-        if(l.pago==='Pago'||l.pago==='Ag pagamento') totalPago += comb;
+        if(l.pago==='Pago') totalPago += comb;
       }
     });
     _renderHomeCards(totalComb, totalPago, metaMensal, 'mensal');
@@ -3366,7 +3366,7 @@ async function carregarHome(){
             if(l.status==='Vendido'){
               var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
               totalCombTri += comb;
-              if(l.pago==='Pago'||l.pago==='Ag pagamento') totalPagoTri += comb;
+              if(l.pago==='Pago') totalPagoTri += comb;
             }
           });
         }
