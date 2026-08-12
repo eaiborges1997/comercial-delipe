@@ -1716,12 +1716,12 @@ async function carregarListaClosers(){
 async function adminVerMeusDados(){
   viewingCloser = null;
   window._viewingEmail = null;
-  var nome = currentUser ? (currentUser.displayName || currentUser.email.split('@')[0]) : '';
-  document.getElementById('nome-closer').value = nome;
   document.getElementById('admin-closer-select').value = '';
-  atualizarNome();
   document.getElementById('consolidado-wrap').classList.remove('visible');
-  await carregarDadosIniciais();
+  var ma = getMesAno();
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var chave = emailKey + '__' + ma.mes + '_' + ma.ano;
+  await carregarDoFirestore(chave);
   setSyncStatus('connected','Visualizando seus proprios dados');
 }
 
@@ -2884,113 +2884,11 @@ updateLead = function(id, campo, val){
 // ==================== FUNCOES ADMIN ====================
 // carregarListaClosers definida acima (usa Firestore)
 
-async function adminVerMeusDados(){
-  // Volta a ver os proprios dados
-  viewingCloser = null;
-  var nome = currentUser ? ((currentUser.user_metadata && currentUser.user_metadata.full_name) || currentUser.email.split('@')[0]) : '';
-  document.getElementById('nome-closer').value = nome;
-  document.getElementById('admin-closer-select').value = '';
-  atualizarNome();
-  document.getElementById('consolidado-wrap').classList.remove('visible');
-  var aba = nomeAba();
-  await criarAbaMesSeNecessario();
-  setSyncStatus('connected','Visualizando seus proprios dados');
-}
+// adminVerMeusDados definida acima (usa Firestore)
 
-async function adminTrocarCloser(){
-  var sel = document.getElementById('admin-closer-select');
-  var email = sel.value;
-  if(!email) return;
-  window._viewingEmail = email;
-  viewingCloser = email;
-  document.getElementById('consolidado-wrap').classList.remove('visible');
-  var nomeExib = sel.options[sel.selectedIndex].textContent;
-  document.getElementById('nome-closer').value = nomeExib.replace(' (Admin)','').replace(' (SDR)','').trim();
-  atualizarNome();
-  var ma = getMesAno();
-  var emailKey = email.replace(/[^a-zA-Z0-9]/g,'_');
-  var chave = emailKey + '__' + ma.mes + '_' + ma.ano;
-  await carregarDoFirestore(chave);
-  setSyncStatus('connected','Admin — visualizando: '+nomeExib);
-}
+// adminTrocarCloser definida acima (usa Firestore)
 
-async function adminVerConsolidado(){
-  if(!accessToken){ alert('Conecte ao Google Sheets primeiro.'); return; }
-  document.getElementById('consolidado-wrap').classList.add('visible');
-  var ma = getMesAno();
-  var sufixo = ma.mes+' '+ma.ano;
-  document.getElementById('consolidado-mes-label').textContent = sufixo;
-  setSyncStatus('syncing','Carregando consolidado...');
-
-  try {
-    var resp = await gapi.client.request({
-      path:'https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID,
-      method:'GET'
-    });
-    var sheets = resp.result.sheets.map(function(s){return s.properties.title;});
-    var abasMes = sheets.filter(function(s){return s.indexOf(' - '+sufixo)>=0;});
-
-    var todosLeads = [];
-    for(var i=0;i<abasMes.length;i++){
-      var aba = abasMes[i];
-      var r = await gapi.client.request({
-        path:'https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(aba+'!A2:ZZ'),
-        method:'GET'
-      });
-      var rows = (r.result.values)||[];
-      var closer = aba.replace(' - '+sufixo,'');
-      rows.forEach(function(row){
-        var l = {};
-        COLUNAS.forEach(function(c,idx){ l[c]=row[idx]||''; });
-        l.mrrServ = parseFloat(l.mrrServ)||0;
-        l.mrrBi   = parseFloat(l.mrrBi)||0;
-        l.evento  = parseFloat(l.evento)||0;
-        l.impl    = parseFloat(l.impl)||0;
-        l.produto = parseFloat(l.produto)||0;
-        l._closer = closer;
-        todosLeads.push(l);
-      });
-    }
-
-    // Calcular consolidado
-    var totalVendas=0,totalMrr=0,totalMrrBi=0,totalComb=0;
-    var porCloser = {};
-    todosLeads.forEach(function(l){
-      if(!porCloser[l._closer]) porCloser[l._closer]={vendas:0,mrr:0,mrrbi:0,comb:0};
-      if(l.status==='Vendido'){
-        totalVendas++; totalMrr+=l.mrrServ; totalMrrBi+=l.mrrBi;
-        var comb=l.mrrServ+l.mrrBi+l.evento+l.impl+l.produto+(l.projetoPersonalizado||0);
-        totalComb+=comb;
-        porCloser[l._closer].vendas++;
-        porCloser[l._closer].mrr+=l.mrrServ;
-        porCloser[l._closer].mrrbi+=l.mrrBi;
-        porCloser[l._closer].comb+=comb;
-      }
-    });
-
-    // Render metrics
-    var mg = document.getElementById('consolidado-metrics');
-    mg.innerHTML =
-      '<div class="metric-card orange"><div class="metric-lbl">Total leads</div><div class="metric-val ora">'+todosLeads.length+'</div><div class="metric-sub">'+abasMes.length+' closers</div></div>'+
-      '<div class="metric-card green"><div class="metric-lbl">Vendas totais</div><div class="metric-val grn">'+totalVendas+'</div></div>'+
-      '<div class="metric-card green"><div class="metric-lbl">MRR Total</div><div class="metric-val grn">'+fmt(totalMrr+totalMrrBi)+'</div></div>'+
-      '<div class="metric-card blue"><div class="metric-lbl">Total Combinado</div><div class="metric-val blu">'+fmt(totalComb)+'</div></div>';
-
-    // Render tabela por closer
-    var ct = document.getElementById('consolidado-table');
-    var h = '<tr><th>Closer</th><th>Vendas</th><th>MRR Serv</th><th>MRR BI</th><th>Total Comb.</th></tr>';
-    var rows = Object.keys(porCloser).map(function(c){
-      var d = porCloser[c];
-      return '<tr><td>'+c+'</td><td class="ora">'+d.vendas+'</td><td class="grn">'+fmt(d.mrr)+'</td><td class="blu">'+fmt(d.mrrbi)+'</td><td class="ora">'+fmt(d.comb)+'</td></tr>';
-    }).join('');
-    ct.innerHTML = h + rows;
-
-    setSyncStatus('connected','Consolidado carregado');
-  } catch(e){
-    setSyncStatus('connected','Erro ao carregar consolidado');
-    console.error(e);
-  }
-}
+// adminVerConsolidado definida acima (usa Firestore)
 
 // ==================== FUNCOES SDR ====================
 function mostrarAbasCloser(){
