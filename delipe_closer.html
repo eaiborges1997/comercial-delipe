@@ -2148,6 +2148,8 @@ function exportarPDF(){
   function setSelect(id, val){
     var el = document.getElementById(id);
     if(!el) return;
+    // Se for input hidden, apenas setar o value
+    if(el.tagName !== 'SELECT'){ el.value = val; return; }
     for(var i=0; i<el.options.length; i++){
       el.options[i].selected = (el.options[i].text === val || el.options[i].value === val);
     }
