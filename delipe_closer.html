@@ -454,9 +454,9 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 
   <div class="card">
     <div class="sec">Leads do mes</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
-      <span style="font-size:11px;color:rgba(255,255,255,.35);font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Filtrar:</span>
-      <select id="filtro-status" onchange="renderLeads()" style="font-size:12px;padding:5px 14px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none">
+    <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center">
+      <span style="font-size:11px;color:rgba(255,255,255,.35);font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;margin-right:2px">Filtrar:</span>
+      <select id="filtro-status" onchange="renderLeads()" style="width:auto;font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;outline:none">
         <option value="">Status ▾</option>
         <option value="Em andamento">Em andamento</option>
         <option value="Em negociacao">Em negociacao</option>
@@ -464,7 +464,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
         <option value="Nao avancou">Nao avancou</option>
         <option value="Nao convertido">Nao convertido</option>
       </select>
-      <select id="filtro-inicial" onchange="renderLeads()" style="font-size:12px;padding:5px 14px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none">
+      <select id="filtro-inicial" onchange="renderLeads()" style="width:auto;font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;outline:none">
         <option value="">Inicial ▾</option>
         <option value="Realizada/Avancou">Realizada/Avancou</option>
         <option value="Realizada/Nao avancou">Realizada/Nao avancou</option>
@@ -473,7 +473,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
         <option value="Cancelada">Cancelada</option>
         <option value="Aguardando nova data">Aguardando nova data</option>
       </select>
-      <select id="filtro-canal" onchange="renderLeads()" style="font-size:12px;padding:5px 14px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans,sans-serif;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none">
+      <select id="filtro-canal" onchange="renderLeads()" style="width:auto;font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;outline:none">
         <option value="">Canal ▾</option>
         <option value="Trafego Pago">Trafego Pago</option>
         <option value="Evento">Evento</option>
@@ -481,15 +481,15 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
         <option value="Base">Base</option>
         <option value="Indicacao">Indicacao</option>
       </select>
-      <select id="filtro-qual" onchange="renderLeads()" style="font-size:12px;padding:5px 14px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;appearance:none;-webkit-appearance:none;outline:none">
+      <select id="filtro-qual" onchange="renderLeads()" style="width:auto;font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;outline:none">
         <option value="">Qualificacao ▾</option>
         <option value="Qualificado+">Qualificado+</option>
         <option value="Qualificado">Qualificado</option>
         <option value="Desqualificado">Desqualificado</option>
         <option value="Nao e provedor">Nao e provedor</option>
       </select>
-      <button onclick="limparFiltros()" style="font-size:12px;padding:5px 12px;border:.5px solid rgba(255,107,0,.3);border-radius:20px;background:transparent;color:rgba(255,107,0,.6);font-family:Inter,sans-serif;cursor:pointer;white-space:nowrap">✕ Limpar</button>
-      <span id="filtro-count" style="font-size:11px;color:rgba(255,255,255,.3);margin-left:2px"></span>
+      <button onclick="limparFiltros()" style="width:auto;font-size:12px;padding:5px 10px;border:.5px solid rgba(255,107,0,.3);border-radius:20px;background:transparent;color:rgba(255,107,0,.6);font-family:Inter,sans-serif;cursor:pointer;white-space:nowrap">✕ Limpar</button>
+      <span id="filtro-count" style="font-size:11px;color:rgba(255,255,255,.3)"></span>
     </div>
     <div class="lead-cards" id="lead-cards"></div>
     <button class="add-lead-btn" onclick="addLead()">+ Adicionar lead</button>
