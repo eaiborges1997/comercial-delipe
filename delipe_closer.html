@@ -327,6 +327,10 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 .hcc-star{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1)}
 .hcc-star.done{background:rgba(255,107,0,.2);border-color:rgba(255,107,0,.4)}
 .hcc-star.paid{background:rgba(27,175,122,.2);border-color:rgba(27,175,122,.4)}
+.home-mes-btn{padding:5px 10px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:.5px solid rgba(255,255,255,.08);transition:all .15s;user-select:none}
+.home-mes-btn:hover{background:rgba(255,107,0,.15);color:rgba(255,107,0,.8);border-color:rgba(255,107,0,.3)}
+.home-mes-btn.active{background:rgba(255,107,0,.2);color:#ff9940;border-color:rgba(255,107,0,.5)}
+.home-mes-btn.current{border-color:rgba(255,255,255,.3)}
 .home-meta-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:16px;padding:1.4rem 1.6rem;position:relative;overflow:hidden}
 .home-meta-card .hmc-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
 .home-meta-card .hmc-meta{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:14px}
@@ -582,9 +586,23 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   <div class="card" id="home-boas-vindas" style="text-align:center;padding:2rem 1.5rem 1.5rem">
     <div style="font-size:28px;font-weight:700;color:#fff;margin-bottom:4px">Bem-vindo, <span id="home-nome" style="color:#ff6b00">—</span></div>
     <div style="font-size:13px;color:rgba(255,255,255,.35);margin-bottom:1.4rem" id="home-subtitulo">Comercial Delipe</div>
-    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-      <div id="home-toggle-mes" onclick="homeSetView('mes')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#ff6b00;color:#fff;border:none">Mês atual</div>
-      <div id="home-toggle-tri" onclick="homeSetView('tri')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);border:none">Trimestre</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
+      <div id="home-toggle-mes" onclick="homeSetView('mes')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#ff6b00;color:#fff">Meses</div>
+      <div id="home-toggle-tri" onclick="homeSetView('tri')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5)">Trimestre</div>
+    </div>
+    <div id="home-meses-picker" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+      <div class="home-mes-btn active" data-mes="Janeiro"   onclick="homeToggleMes(this)">Jan</div>
+      <div class="home-mes-btn" data-mes="Fevereiro"  onclick="homeToggleMes(this)">Fev</div>
+      <div class="home-mes-btn" data-mes="Marco"      onclick="homeToggleMes(this)">Mar</div>
+      <div class="home-mes-btn" data-mes="Abril"      onclick="homeToggleMes(this)">Abr</div>
+      <div class="home-mes-btn" data-mes="Maio"       onclick="homeToggleMes(this)">Mai</div>
+      <div class="home-mes-btn" data-mes="Junho"      onclick="homeToggleMes(this)">Jun</div>
+      <div class="home-mes-btn" data-mes="Julho"      onclick="homeToggleMes(this)">Jul</div>
+      <div class="home-mes-btn" data-mes="Agosto"     onclick="homeToggleMes(this)">Ago</div>
+      <div class="home-mes-btn" data-mes="Setembro"   onclick="homeToggleMes(this)">Set</div>
+      <div class="home-mes-btn" data-mes="Outubro"    onclick="homeToggleMes(this)">Out</div>
+      <div class="home-mes-btn" data-mes="Novembro"   onclick="homeToggleMes(this)">Nov</div>
+      <div class="home-mes-btn" data-mes="Dezembro"   onclick="homeToggleMes(this)">Dez</div>
     </div>
   </div>
 
@@ -3241,12 +3259,45 @@ function _renderCampanha(dados, meta, labelPeriodo){
 var _homeView = 'mes';       // 'mes' | 'tri'
 var _homeUserView = 'eu';    // 'eu' | 'time'  (admin only)
 
+// Meses selecionados pelo usuario (multi-select)
+var _homeSelectedMeses = [];  // populado ao iniciar com mes atual
+
+function _initHomeSelectedMeses(){
+  var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var ma = getMesAno();
+  _homeSelectedMeses = [ma.mes];
+  // Marcar botao do mes atual como "current" e ativo, resto inactive
+  document.querySelectorAll('.home-mes-btn').forEach(function(btn){
+    var m = btn.dataset.mes;
+    btn.classList.toggle('active', m === ma.mes);
+    btn.classList.toggle('current', m === ma.mes);
+  });
+}
+
+function homeToggleMes(btn){
+  if(_homeView !== 'mes') return;
+  var mes = btn.dataset.mes;
+  var idx = _homeSelectedMeses.indexOf(mes);
+  if(idx >= 0){
+    // Deselect — mas nao pode ficar zero
+    if(_homeSelectedMeses.length === 1) return;
+    _homeSelectedMeses.splice(idx, 1);
+    btn.classList.remove('active');
+  } else {
+    _homeSelectedMeses.push(mes);
+    btn.classList.add('active');
+  }
+  carregarHome();
+}
+
 function homeSetView(v){
   _homeView = v;
+  var picker = document.getElementById('home-meses-picker');
   document.getElementById('home-toggle-mes').style.background = v==='mes'?'#ff6b00':'rgba(255,255,255,.08)';
   document.getElementById('home-toggle-mes').style.color = v==='mes'?'#fff':'rgba(255,255,255,.5)';
   document.getElementById('home-toggle-tri').style.background = v==='tri'?'#ff6b00':'rgba(255,255,255,.08)';
   document.getElementById('home-toggle-tri').style.color = v==='tri'?'#fff':'rgba(255,255,255,.5)';
+  if(picker) picker.style.display = v==='mes'?'flex':'none';
   carregarHome();
 }
 
@@ -3306,6 +3357,9 @@ async function carregarHome(){
     document.getElementById('home-admin-bar').style.display='block';
   }
 
+  // Inicializar meses selecionados se vazio
+  if(_homeSelectedMeses.length === 0) _initHomeSelectedMeses();
+
   // Nome
   var nome = currentUser.displayName || currentUser.nome || currentUser.email.split('@')[0];
   document.getElementById('home-nome').textContent = nome.split(' ')[0];
@@ -3331,19 +3385,52 @@ async function carregarHome(){
   var ma = getMesAno();
 
   if(_homeView === 'mes'){
-    document.getElementById('home-subtitulo').textContent = ma.mes+' de '+ma.ano;
-    // Usar leads ja carregados
+    // Suporte a multiplos meses selecionados
+    var mesesSel = _homeSelectedMeses.length > 0 ? _homeSelectedMeses : [ma.mes];
+    var labelMeses = mesesSel.length === 1 ? mesesSel[0]+' de '+ma.ano : mesesSel.join(', ')+' / '+ma.ano;
+    document.getElementById('home-subtitulo').textContent = labelMeses;
+
     var totalComb = 0, totalPago = 0;
-    leads.forEach(function(l){
-      if(l.status==='Vendido'){
-        var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
-        totalComb += comb;
-        if(l.pago==='Pago') totalPago += comb;
+    var leadsMulti = [];
+
+    // Se so um mes e e o mes atual, usar leads ja carregados
+    if(mesesSel.length === 1 && mesesSel[0] === ma.mes){
+      leads.forEach(function(l){
+        if(l.status==='Vendido'){
+          var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+          totalComb += comb;
+          if(l.pago==='Pago') totalPago += comb;
+        }
+      });
+      leadsMulti = leads;
+    } else {
+      // Carregar cada mes selecionado do Firestore
+      for(var mi=0; mi<mesesSel.length; mi++){
+        var chaveM = emailKey+'__'+mesesSel[mi]+'_'+ma.ano;
+        try {
+          var snapM = await fb.getDoc(fb.doc(fb.db,'leads',chaveM));
+          if(snapM.exists() && snapM.data().leads){
+            var leadsM = snapM.data().leads;
+            leadsMulti = leadsMulti.concat(leadsM);
+            leadsM.forEach(function(l){
+              if(l.status==='Vendido'){
+                var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+                totalComb += comb;
+                if(l.pago==='Pago') totalPago += comb;
+              }
+            });
+          }
+        } catch(e){ console.warn('load mes err',mesesSel[mi],e); }
       }
-    });
-    _renderHomeCards(totalComb, totalPago, metaMensal, 'mensal');
-    var dadosCamp = _calcCampanha(leads);
-    _renderCampanha(dadosCamp, 6, 'mensal (6 recorrências)');
+    }
+
+    // Meta: proporcional ao numero de meses selecionados
+    var metaProporcional = metaMensal * mesesSel.length;
+    var labelMeta = mesesSel.length > 1 ? 'acumulado ('+mesesSel.length+' meses)' : 'mensal';
+    _renderHomeCards(totalComb, totalPago, metaProporcional, labelMeta);
+    var dadosCamp = _calcCampanha(leadsMulti);
+    var metaRecMeses = 6 * mesesSel.length;
+    _renderCampanha(dadosCamp, metaRecMeses, labelMeta+' ('+metaRecMeses+' recorrências)');
 
   } else {
     // Trimestre — carregar 3 meses
