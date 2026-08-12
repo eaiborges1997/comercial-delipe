@@ -994,9 +994,15 @@ function buildLeadCard(l,i){
   var totalComb = (l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
   var isPago = l.status==='Vendido' && (l.pago==='Pago'||l.pago==='Ag pagamento'||l.pago==='Atrasado');
 
-  // Cor do status de pagamento
-  var pagoColor = l.pago==='Pago' ? '#1baf7a' : l.pago==='Atrasado' ? '#e34948' : 'rgba(255,255,255,.45)';
-  var pagoLabel = l.pago==='Pago' ? '✓ Pago' : l.pago==='Atrasado' ? '⚠ Atrasado' : l.pago==='Ag pagamento' ? 'Ag pagamento' : '';
+  // Badge de pagamento destacado
+  var pagoBg    = l.pago==='Pago' ? 'rgba(27,175,122,.2)' : l.pago==='Atrasado' ? 'rgba(227,73,72,.2)' : 'rgba(255,255,255,.08)';
+  var pagoColor = l.pago==='Pago' ? '#1baf7a' : l.pago==='Atrasado' ? '#e34948' : 'rgba(255,255,255,.5)';
+  var pagoBorder= l.pago==='Pago' ? 'rgba(27,175,122,.4)' : l.pago==='Atrasado' ? 'rgba(227,73,72,.4)' : 'rgba(255,255,255,.15)';
+  var pagoIcon  = l.pago==='Pago' ? '✓ ' : l.pago==='Atrasado' ? '⚠ ' : '';
+  var pagoLabel = l.pago && l.pago!=='Nao se aplica' ? pagoIcon+l.pago : '';
+  var pagoBadge = pagoLabel && l.status==='Vendido'
+    ? '<span style="display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:'+pagoBg+';color:'+pagoColor+';border:.5px solid '+pagoBorder+';margin-left:6px">'+pagoLabel+'</span>'
+    : '';
 
   if(isPago && totalComb > 0){
     var partes = [];
@@ -1005,14 +1011,11 @@ function buildLeadCard(l,i){
     if((l.evento||0) > 0) partes.push('Ev: '+fmt(l.evento));
     if((l.impl||0) > 0) partes.push('Impl: '+fmt(l.impl));
     if((l.projetoPersonalizado||0) > 0) partes.push('Proj: '+fmt(l.projetoPersonalizado));
-    if(pagoLabel) partes.push('<span style="color:'+pagoColor+';font-weight:600">'+pagoLabel+'</span>');
-    mrr.innerHTML = partes.join(' · ');
+    mrr.innerHTML = partes.join(' · ') + pagoBadge;
   } else if(totalMrr > 0){
-    var txt = fmt(totalMrr)+'/mes';
-    if(pagoLabel && l.status==='Vendido') txt += ' · <span style="color:'+pagoColor+';font-weight:600">'+pagoLabel+'</span>';
-    mrr.innerHTML = txt;
-  } else if(l.status==='Vendido' && pagoLabel){
-    mrr.innerHTML = '<span style="color:'+pagoColor+';font-weight:600">'+pagoLabel+'</span>';
+    mrr.innerHTML = fmt(totalMrr)+'/mes' + pagoBadge;
+  } else if(l.status==='Vendido' && pagoBadge){
+    mrr.innerHTML = pagoBadge;
   }
 
   var chev=document.createElement('span');
