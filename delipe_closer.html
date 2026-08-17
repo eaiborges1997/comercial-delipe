@@ -1157,7 +1157,7 @@ function renderLeads(){
     if(fStatus  && l.status !== fStatus) return false;
     if(fCanal   && l.canal  !== fCanal)  return false;
     if(fQual    && l.qualificacao !== fQual) return false;
-    if(fPago    && l.pago !== fPago) return false;
+    if(fPago && (l.status !== 'Vendido' || l.pago !== fPago)) return false;
     if(fInicial){
       if(fInicial === 'Proposta No-show'){
         if(l.statusProposta !== 'Proposta No-show') return false;
