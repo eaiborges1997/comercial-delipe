@@ -841,6 +841,8 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
       <div style="padding:0 1.5rem 1.5rem">
         <div id="cfg-servicos-wrap"></div>
         <button class="add-lead-btn" onclick="addServico()">+ Adicionar servico</button>
+        <button onclick="salvarConfig()" style="margin-left:8px;padding:7px 16px;background:#ff6b00;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">Salvar alterações</button>
+        <span id="cfg-save-feedback" style="font-size:12px;color:#1baf7a;margin-left:10px;display:none">✓ Salvo!</span>
       </div>
     </details>
   </div>
@@ -1046,6 +1048,7 @@ function showTab(t){
   var idx=tabs.indexOf(t);
   if(idx>=0) document.querySelectorAll('#tabs-closer .tab')[idx].classList.add('active');
   if(t!=='home') recalc();
+  if(t==='config') carregarConfig();
 }
 
 // ---- LEAD MODEL ----
@@ -1885,7 +1888,7 @@ function renderConfig(){
     var inp=document.createElement('input'); inp.type='text'; inp.value=s;
     inp.onchange=(function(idx){return function(){SERVICOS[idx]=this.value;recalc();};})(i);
     var rmb=document.createElement('button'); rmb.className='rm-lead-btn'; rmb.textContent='x';
-    rmb.onclick=(function(idx){return function(){SERVICOS.splice(idx,1);renderConfig();recalc();};})(i);
+    rmb.onclick=(function(idx){return function(){SERVICOS.splice(idx,1);renderConfig();recalc();salvarConfig();};})(i);
     row.appendChild(inp); row.appendChild(rmb); sw.appendChild(row);
   });}
 
@@ -1896,7 +1899,7 @@ function renderConfig(){
     var inp=document.createElement('input'); inp.type='text'; inp.value=c;
     inp.onchange=(function(idx){return function(){CARGOS[idx]=this.value;};})(i);
     var rmb=document.createElement('button'); rmb.className='rm-lead-btn'; rmb.textContent='x';
-    rmb.onclick=(function(idx){return function(){CARGOS.splice(idx,1);renderConfig();};})(i);
+    rmb.onclick=(function(idx){return function(){CARGOS.splice(idx,1);renderConfig();salvarConfig();};})(i);
     row.appendChild(inp); row.appendChild(rmb); cw.appendChild(row);
   });}
 
@@ -1924,8 +1927,56 @@ function renderConfig(){
   });}
 }
 
-function addServico(){ var n=prompt('Nome do servico:'); if(n&&n.trim()){SERVICOS.push(n.trim());renderConfig();} }
-function addCargo(){ var n=prompt('Nome do cargo:'); if(n&&n.trim()){CARGOS.push(n.trim());renderConfig();} }
+function addServico(){
+  var n=prompt('Nome do servico/produto:');
+  if(n&&n.trim()){ SERVICOS.push(n.trim()); renderConfig(); salvarConfig(); }
+}
+function addCargo(){
+  var n=prompt('Nome do cargo:');
+  if(n&&n.trim()){ CARGOS.push(n.trim()); renderConfig(); salvarConfig(); }
+}
+
+async function salvarConfig(){
+  if(!window._fb || !currentUser) return;
+  var fb = window._fb;
+  // Coletar valores atuais dos inputs (o usuario pode ter editado sem mudar o array)
+  var sw = document.getElementById('cfg-servicos-wrap');
+  if(sw){
+    var inputs = sw.querySelectorAll('input[type=text]');
+    SERVICOS = Array.from(inputs).map(function(i){return i.value.trim();}).filter(Boolean);
+  }
+  var cw = document.getElementById('cfg-cargos-wrap');
+  if(cw){
+    var inputs2 = cw.querySelectorAll('input[type=text]');
+    CARGOS = Array.from(inputs2).map(function(i){return i.value.trim();}).filter(Boolean);
+  }
+  try {
+    await fb.setDoc(fb.doc(fb.db,'config','global'),{
+      servicos: SERVICOS,
+      cargos: CARGOS,
+      updatedAt: Date.now(),
+      updatedBy: currentUser.email
+    },{merge:true});
+    var fb2 = document.getElementById('cfg-save-feedback');
+    if(fb2){ fb2.style.display='inline'; setTimeout(function(){fb2.style.display='none';},2500); }
+  } catch(e){
+    alert('Erro ao salvar: '+e.message);
+  }
+}
+
+async function carregarConfig(){
+  if(!window._fb) return;
+  var fb = window._fb;
+  try {
+    var snap = await fb.getDoc(fb.doc(fb.db,'config','global'));
+    if(snap.exists()){
+      var data = snap.data();
+      if(data.servicos && data.servicos.length > 0) SERVICOS = data.servicos;
+      if(data.cargos   && data.cargos.length   > 0) CARGOS   = data.cargos;
+    }
+  } catch(e){ console.warn('carregarConfig err:', e); }
+  renderConfig();
+}
 
 // Migracao de leads: move leads especificos de agosto para julho
 
@@ -2593,6 +2644,7 @@ function mostrarApp(user){
     }
     setTimeout(carregarDadosIniciais, 500);
     setTimeout(function(){ carregarHome(); }, 800);
+    setTimeout(function(){ carregarConfig(); }, 1000);
   } else if(isSdr){
     document.getElementById('admin-bar').classList.remove('visible');
     document.getElementById('admin-only-config').classList.remove('visible');
@@ -2619,6 +2671,7 @@ function mostrarApp(user){
     }
     setTimeout(carregarDadosIniciais, 500);
     setTimeout(function(){ carregarHome(); }, 800);
+    setTimeout(function(){ carregarConfig(); }, 1000);
   }
 }
 
