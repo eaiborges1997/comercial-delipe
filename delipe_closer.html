@@ -1236,8 +1236,15 @@ function buildLeadCard(l,i){
   var pagoBorder= l.pago==='Pago' ? 'rgba(27,175,122,.4)' : l.pago==='Atrasado' ? 'rgba(227,73,72,.4)' : 'rgba(255,255,255,.15)';
   var pagoIcon  = l.pago==='Pago' ? '✓ ' : l.pago==='Atrasado' ? '⚠ ' : '';
   var pagoLabel = l.pago && l.pago!=='Nao se aplica' ? pagoIcon+l.pago : '';
-  var pagoBadge = pagoLabel && l.status==='Vendido'
-    ? '<span style="display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:'+pagoBg+';color:'+pagoColor+';border:.5px solid '+pagoBorder+';margin-left:6px">'+pagoLabel+'</span>'
+  // Dropdown inline de pagamento (so para Vendido)
+  var pagoBadge = l.status==='Vendido'
+    ? '<select onchange="alterarPago('+l.id+',this.value)" onclick="event.stopPropagation()" style="font-size:11px;font-weight:700;padding:2px 6px;border-radius:5px;background:'+pagoBg+';color:'+pagoColor+';border:.5px solid '+pagoBorder+';margin-left:6px;cursor:pointer;outline:none;font-family:Inter,sans-serif">'+
+      ['Ag pagamento','Pago','Atrasado','Nao se aplica'].map(function(op){
+        var sel=op===l.pago?' selected':'';
+        var icon=op==='Pago'?'✓ ':op==='Atrasado'?'⚠ ':'';
+        return '<option value="'+op+'"'+sel+'>'+icon+op+'</option>';
+      }).join('')+
+      '</select>'
     : '';
 
   if(isPago && totalComb > 0){
@@ -1925,6 +1932,15 @@ function renderConfig(){
     };})(k,inp);
     cwr.appendChild(pre); cwr.appendChild(inp); wrap.appendChild(lbl); wrap.appendChild(cwr); bw.appendChild(wrap);
   });}
+}
+
+function alterarPago(leadId, novoPago){
+  var l = leads.find(function(x){ return x.id === leadId; });
+  if(!l) return;
+  l.pago = novoPago;
+  // Re-render so badge colors update immediately
+  renderLeads();
+  agendarSalvamento();
 }
 
 function addServico(){
