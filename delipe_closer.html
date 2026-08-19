@@ -327,6 +327,28 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 .hcc-star{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.1)}
 .hcc-star.done{background:rgba(255,107,0,.2);border-color:rgba(255,107,0,.4)}
 .hcc-star.paid{background:rgba(27,175,122,.2);border-color:rgba(27,175,122,.4)}
+.cart-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;transition:border-color .15s}
+.cart-card:hover{border-color:rgba(255,255,255,.15)}
+.cart-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.4rem;cursor:pointer;gap:12px;flex-wrap:wrap}
+.cart-empresa{font-size:15px;font-weight:700;color:#fff}
+.cart-cnpj{font-size:11px;color:rgba(255,255,255,.3);margin-top:2px}
+.cart-contato{font-size:12px;color:rgba(255,255,255,.45);margin-top:4px}
+.cart-status-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;cursor:pointer;border:none;font-family:Inter,sans-serif;white-space:nowrap}
+.cart-status-ativo{background:rgba(27,175,122,.2);color:#1baf7a;border:.5px solid rgba(27,175,122,.4)}
+.cart-status-churn{background:rgba(227,73,72,.2);color:#e34948;border:.5px solid rgba(227,73,72,.4)}
+.cart-status-pausado{background:rgba(255,153,64,.2);color:#ff9940;border:.5px solid rgba(255,153,64,.4)}
+.cart-status-inadimplente{background:rgba(255,107,0,.2);color:#ff6b00;border:.5px solid rgba(255,107,0,.4)}
+.cart-body{border-top:.5px solid rgba(255,255,255,.06);padding:1rem 1.4rem;display:none}
+.cart-body.open{display:block}
+.cart-servico-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid rgba(255,255,255,.05);flex-wrap:wrap}
+.cart-servico-row:last-child{border-bottom:none}
+.cart-serv-nome{font-size:13px;color:#fff;font-weight:500;flex:1;min-width:120px}
+.cart-serv-vals{font-size:12px;color:rgba(255,255,255,.45);margin-right:6px}
+.cart-serv-mes{font-size:11px;color:rgba(255,255,255,.25);font-style:italic}
+.cart-status-sel{font-size:11px;font-weight:600;padding:3px 8px;border-radius:12px;cursor:pointer;border:.5px solid;font-family:Inter,sans-serif;outline:none}
+.cart-summary{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:.5px solid rgba(255,255,255,.06)}
+.cart-sum-item{font-size:12px;color:rgba(255,255,255,.4)}
+.cart-sum-item strong{color:#fff;font-size:13px}
 .home-mes-btn{padding:5px 10px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:.5px solid rgba(255,255,255,.08);transition:all .15s;user-select:none}
 .home-mes-btn:hover{background:rgba(255,107,0,.15);color:rgba(255,107,0,.8);border-color:rgba(255,107,0,.3)}
 .home-mes-btn.active{background:rgba(255,107,0,.2);color:#ff9940;border-color:rgba(255,107,0,.5)}
@@ -573,6 +595,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   <button class="tab" onclick="showTab('metricas')">Metricas</button>
   <button class="tab" onclick="showTab('comissao')">Comissao</button>
   <button class="tab" onclick="showTab('trimestre');carregarTrimestre()">Trimestre</button>
+  <button class="tab" onclick="showTab('carteira');carregarCarteira()">Carteira</button>
   <button class="tab" onclick="showTab('config')">Config</button>
 </div>
 <div class="tabs" id="tabs-sdr" style="display:none">
@@ -783,6 +806,30 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
       <div id="tri-meses"></div>
     </div>
   </div>
+</div>
+
+<div id="tab-carteira" class="tab-content">
+  <div class="card" style="padding:1.2rem 1.5rem;margin-bottom:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#ff6b00;text-transform:uppercase;letter-spacing:.06em">Carteira de Clientes</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:2px">Clientes com serviços vendidos e pagos · agrupados por CNPJ</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="cart-filtro-status" onchange="renderCarteira()" style="font-size:12px;padding:6px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;outline:none">
+          <option value="">Todos os status</option>
+          <option value="Ativo">Ativo</option>
+          <option value="Pausado">Pausado</option>
+          <option value="Inadimplente">Inadimplente</option>
+          <option value="Churn">Churn</option>
+        </select>
+        <input id="cart-busca" oninput="renderCarteira()" placeholder="Buscar cliente..." style="font-size:12px;padding:6px 12px;border:.5px solid rgba(255,255,255,.15);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;outline:none;width:180px">
+        <div id="cart-count" style="font-size:12px;color:rgba(255,255,255,.3)"></div>
+      </div>
+    </div>
+  </div>
+  <div id="cart-loading" style="text-align:center;padding:2rem;font-size:13px;color:rgba(255,255,255,.35)">Carregando carteira...</div>
+  <div id="cart-grid" style="display:none;margin-top:14px;display:flex;flex-direction:column;gap:10px"></div>
 </div>
 
 <div id="tab-config" class="tab-content">
@@ -1044,11 +1091,12 @@ function showTab(t){
   document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active');});
   document.querySelectorAll('#tabs-closer .tab').forEach(function(e){e.classList.remove('active');});
   document.getElementById('tab-'+t).classList.add('active');
-  var tabs=['home','funil','metricas','comissao','trimestre','config'];
+  var tabs=['home','funil','metricas','comissao','trimestre','carteira','config'];
   var idx=tabs.indexOf(t);
   if(idx>=0) document.querySelectorAll('#tabs-closer .tab')[idx].classList.add('active');
   if(t!=='home') recalc();
   if(t==='config') carregarConfig();
+  if(t==='carteira') carregarCarteira();
 }
 
 // ---- LEAD MODEL ----
@@ -3662,6 +3710,238 @@ async function salvarMinhasMetas(){
     fb2.style.display='block';fb2.style.color='#e34948';
     fb2.textContent='Erro ao salvar: '+e.message;
   }
+}
+
+
+// ==================== CARTEIRA DE CLIENTES ====================
+// Chave do documento no Firestore: carteira/{emailKey}
+// Estrutura: { clientes: { [cnpj]: { statusCliente, servicos: [{...}] } } }
+
+var _carteiraData = {};   // cache local { cnpj: { statusCliente, empresa, cnpj, contatoNome, contatoTel, servicos:[...] } }
+
+function _cartStatusClass(s){
+  if(s==='Ativo') return 'cart-status-ativo';
+  if(s==='Churn') return 'cart-status-churn';
+  if(s==='Pausado') return 'cart-status-pausado';
+  return 'cart-status-inadimplente';
+}
+
+function _cartStatusSelStyle(s){
+  if(s==='Ativo') return 'background:rgba(27,175,122,.15);color:#1baf7a;border-color:rgba(27,175,122,.4)';
+  if(s==='Churn') return 'background:rgba(227,73,72,.15);color:#e34948;border-color:rgba(227,73,72,.4)';
+  if(s==='Pausado') return 'background:rgba(255,153,64,.15);color:#ff9940;border-color:rgba(255,153,64,.4)';
+  return 'background:rgba(255,107,0,.15);color:#ff6b00;border-color:rgba(255,107,0,.4)';
+}
+
+function _statusOptions(current){
+  return ['Ativo','Pausado','Inadimplente','Churn'].map(function(s){
+    return '<option value="'+s+'"'+(s===current?' selected':'')+'>'+s+'</option>';
+  }).join('');
+}
+
+function _fmt(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+
+async function carregarCarteira(){
+  if(!currentUser || !window._fb) return;
+  document.getElementById('cart-loading').style.display='block';
+  document.getElementById('cart-grid').style.display='none';
+  var fb = window._fb;
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+
+  try {
+    // Carregar status salvo no Firestore
+    var snapCart = await fb.getDoc(fb.doc(fb.db,'carteira',emailKey));
+    var savedData = snapCart.exists() ? (snapCart.data().clientes || {}) : {};
+
+    // Varrer TODOS os meses do Firestore para este closer
+    var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var anos = ['2025','2026'];
+    var clientesMap = {};
+
+    for(var a=0; a<anos.length; a++){
+      for(var m=0; m<MESES_PT.length; m++){
+        var chave = emailKey+'__'+MESES_PT[m]+'_'+anos[a];
+        try {
+          var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
+          if(!snap.exists()) continue;
+          var leadsArr = snap.data().leads || [];
+          leadsArr.forEach(function(l){
+            if(l.status !== 'Vendido' || l.pago !== 'Pago') return;
+            var cnpj = (l.cnpj || '').trim() || ('sem-cnpj-'+l.empresa.replace(/\s/g,'').toLowerCase());
+            if(!clientesMap[cnpj]){
+              clientesMap[cnpj] = {
+                empresa: l.empresa || '',
+                cnpj: l.cnpj || '',
+                contatoNome: l.contatoNome || '',
+                contatoTel: l.contatoTel || '',
+                statusCliente: (savedData[cnpj] && savedData[cnpj].statusCliente) || 'Ativo',
+                servicos: []
+              };
+            } else {
+              // Atualizar contato se vazio
+              if(!clientesMap[cnpj].contatoNome && l.contatoNome) clientesMap[cnpj].contatoNome = l.contatoNome;
+              if(!clientesMap[cnpj].contatoTel  && l.contatoTel)  clientesMap[cnpj].contatoTel  = l.contatoTel;
+            }
+            // Adicionar cada serviço vendido como linha
+            var savedServicos = savedData[cnpj] ? (savedData[cnpj].servicos || []) : [];
+            var servKey = MESES_PT[m]+'_'+anos[a]+'_'+(l.servico||'')+'_'+(l.id||'');
+            var savedServ = savedServicos.find(function(s){ return s.key === servKey; }) || {};
+            clientesMap[cnpj].servicos.push({
+              key: servKey,
+              servico: l.servico || 'Serviço não informado',
+              mes: MESES_PT[m]+'/'+anos[a],
+              mrrServ: l.mrrServ || 0,
+              mrrBi: l.mrrBi || 0,
+              impl: l.impl || 0,
+              produto: l.produto || 0,
+              evento: l.evento || 0,
+              statusServico: savedServ.statusServico || 'Ativo'
+            });
+          });
+        } catch(e){ /* doc nao existe, ok */ }
+      }
+    }
+
+    _carteiraData = clientesMap;
+    document.getElementById('cart-loading').style.display='none';
+    document.getElementById('cart-grid').style.display='flex';
+    renderCarteira();
+  } catch(e){
+    console.error('carregarCarteira err:', e);
+    document.getElementById('cart-loading').textContent = 'Erro ao carregar: '+e.message;
+  }
+}
+
+function renderCarteira(){
+  var grid = document.getElementById('cart-grid');
+  if(!grid) return;
+  var filtroStatus = (document.getElementById('cart-filtro-status')||{}).value || '';
+  var busca = ((document.getElementById('cart-busca')||{}).value || '').toLowerCase().trim();
+
+  var clientes = Object.values(_carteiraData);
+
+  // Filtros
+  if(filtroStatus) clientes = clientes.filter(function(c){ return c.statusCliente === filtroStatus; });
+  if(busca) clientes = clientes.filter(function(c){
+    return c.empresa.toLowerCase().includes(busca) ||
+           (c.cnpj||'').includes(busca) ||
+           (c.contatoNome||'').toLowerCase().includes(busca);
+  });
+
+  // Ordenar: Ativo primeiro, depois Inadimplente, Pausado, Churn
+  var ordem = {Ativo:0,Inadimplente:1,Pausado:2,Churn:3};
+  clientes.sort(function(a,b){ return (ordem[a.statusCliente]||0)-(ordem[b.statusCliente]||0); });
+
+  var cnt = document.getElementById('cart-count');
+  if(cnt) cnt.textContent = clientes.length+' cliente'+(clientes.length!==1?'s':'');
+
+  if(clientes.length === 0){
+    grid.innerHTML = '<div class="card" style="text-align:center;padding:2rem;color:rgba(255,255,255,.3);font-size:13px">'
+      +(Object.keys(_carteiraData).length === 0
+        ? 'Nenhum cliente encontrado. Leads com status Vendido + Pago aparecerão aqui.'
+        : 'Nenhum cliente corresponde ao filtro.')
+      +'</div>';
+    return;
+  }
+
+  grid.innerHTML = clientes.map(function(c, ci){
+    var cnpjKey = c.cnpj || Object.keys(_carteiraData).find(function(k){ return _carteiraData[k] === c; });
+    var totalMrr = c.servicos.reduce(function(s,sv){ return s+(sv.mrrServ||0)+(sv.mrrBi||0); },0);
+    var totalImpl = c.servicos.reduce(function(s,sv){ return s+(sv.impl||0)+(sv.produto||0)+(sv.evento||0); },0);
+    var qtdAtivos = c.servicos.filter(function(sv){ return sv.statusServico==='Ativo'; }).length;
+
+    var statusCls = _cartStatusClass(c.statusCliente);
+
+    var servicosHtml = c.servicos.map(function(sv, si){
+      var vals = [];
+      if((sv.mrrServ||0)>0) vals.push(_fmt(sv.mrrServ)+'/mês');
+      if((sv.mrrBi||0)>0) vals.push('BI: '+_fmt(sv.mrrBi)+'/mês');
+      if((sv.impl||0)>0) vals.push('Impl: '+_fmt(sv.impl));
+      if((sv.produto||0)>0) vals.push('Prod: '+_fmt(sv.produto));
+      if((sv.evento||0)>0) vals.push('Ev: '+_fmt(sv.evento));
+      var selStyle = _cartStatusSelStyle(sv.statusServico);
+      return '<div class="cart-servico-row">'
+        +'<div class="cart-serv-nome">'+sv.servico+'</div>'
+        +'<div class="cart-serv-vals">'+vals.join(' · ')+'</div>'
+        +'<div class="cart-serv-mes">'+sv.mes+'</div>'
+        +'<select class="cart-status-sel" style="'+selStyle+'" '
+          +'onchange="alterarStatusServico(''+cnpjKey+'','+si+',this.value)" '
+          +'onclick="event.stopPropagation()">'
+          +_statusOptions(sv.statusServico)
+        +'</select>'
+      +'</div>';
+    }).join('');
+
+    return '<div class="cart-card" id="cart-card-'+ci+'">'
+      +'<div class="cart-header" onclick="toggleCartCard('+ci+')">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div class="cart-empresa">'+c.empresa+'</div>'
+          +(c.cnpj?'<div class="cart-cnpj">CNPJ: '+c.cnpj+'</div>':'')
+          +(c.contatoNome||c.contatoTel
+            ? '<div class="cart-contato">👤 '+(c.contatoNome||'')+(c.contatoTel?' · 📞 '+c.contatoTel:'')+'</div>'
+            : '')
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">'
+          +'<div style="font-size:12px;color:rgba(255,255,255,.3)">'+c.servicos.length+' serv. · '+qtdAtivos+' ativo'+(qtdAtivos!==1?'s':'')+'</div>'
+          +(totalMrr>0?'<div style="font-size:12px;font-weight:600;color:#1baf7a">'+_fmt(totalMrr)+'/mês</div>':'')
+          +'<select class="cart-status-badge '+statusCls+'" '
+            +'onchange="alterarStatusCliente(''+cnpjKey+'',this.value)" '
+            +'onclick="event.stopPropagation()">'
+            +_statusOptions(c.statusCliente)
+          +'</select>'
+          +'<span style="color:rgba(255,255,255,.3);font-size:12px">▼</span>'
+        +'</div>'
+      +'</div>'
+      +'<div class="cart-body" id="cart-body-'+ci+'">'
+        +servicosHtml
+        +'<div class="cart-summary">'
+          +(totalMrr>0?'<div class="cart-sum-item">MRR total <strong>'+_fmt(totalMrr)+'/mês</strong></div>':'')
+          +(totalImpl>0?'<div class="cart-sum-item">One-time <strong>'+_fmt(totalImpl)+'</strong></div>':'')
+          +'<div class="cart-sum-item">Serviços <strong>'+c.servicos.length+'</strong></div>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function toggleCartCard(i){
+  var body = document.getElementById('cart-body-'+i);
+  if(body) body.classList.toggle('open');
+}
+
+async function _salvarCarteira(){
+  if(!currentUser || !window._fb) return;
+  var fb = window._fb;
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  // Serializar apenas os campos de status (nao os dados calculados)
+  var toSave = {};
+  Object.keys(_carteiraData).forEach(function(cnpj){
+    var c = _carteiraData[cnpj];
+    toSave[cnpj] = {
+      statusCliente: c.statusCliente,
+      servicos: c.servicos.map(function(sv){
+        return { key: sv.key, statusServico: sv.statusServico };
+      })
+    };
+  });
+  try {
+    await fb.setDoc(fb.doc(fb.db,'carteira',emailKey),{ clientes: toSave },{ merge:true });
+  } catch(e){ console.error('salvar carteira err:', e); }
+}
+
+function alterarStatusCliente(cnpj, novoStatus){
+  if(!_carteiraData[cnpj]) return;
+  _carteiraData[cnpj].statusCliente = novoStatus;
+  renderCarteira();
+  _salvarCarteira();
+}
+
+function alterarStatusServico(cnpj, si, novoStatus){
+  if(!_carteiraData[cnpj] || !_carteiraData[cnpj].servicos[si]) return;
+  _carteiraData[cnpj].servicos[si].statusServico = novoStatus;
+  renderCarteira();
+  _salvarCarteira();
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
