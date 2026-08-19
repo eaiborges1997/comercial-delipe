@@ -3866,7 +3866,7 @@ function renderCarteira(){
         +'<div class="cart-serv-vals">'+vals.join(' · ')+'</div>'
         +'<div class="cart-serv-mes">'+sv.mes+'</div>'
         +'<select class="cart-status-sel" style="'+selStyle+'" '
-          +'onchange="alterarStatusServico(''+cnpjKey+'','+si+',this.value)" '
+          +'data-cnpj="'+cnpjKey+'" data-si="'+si+'" onchange="alterarStatusServico(this.dataset.cnpj,parseInt(this.dataset.si),this.value)" '
           +'onclick="event.stopPropagation()">'
           +_statusOptions(sv.statusServico)
         +'</select>'
@@ -3886,7 +3886,7 @@ function renderCarteira(){
           +'<div style="font-size:12px;color:rgba(255,255,255,.3)">'+c.servicos.length+' serv. · '+qtdAtivos+' ativo'+(qtdAtivos!==1?'s':'')+'</div>'
           +(totalMrr>0?'<div style="font-size:12px;font-weight:600;color:#1baf7a">'+_fmt(totalMrr)+'/mês</div>':'')
           +'<select class="cart-status-badge '+statusCls+'" '
-            +'onchange="alterarStatusCliente(''+cnpjKey+'',this.value)" '
+            +'data-cnpj="'+cnpjKey+'" onchange="alterarStatusCliente(this.dataset.cnpj,this.value)" '
             +'onclick="event.stopPropagation()">'
             +_statusOptions(c.statusCliente)
           +'</select>'
