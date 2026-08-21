@@ -4218,59 +4218,39 @@ var XLSX_COLS = [
 var _xlsxLeadsPendentes = [];  // leads parsed aguardando confirmação
 
 function _downloadXLSX(wb, filename){
+  // Gerar CSV simples como fallback sempre disponivel
+  // Mas primeiro tentar xlsx via Blob
+  var wbout, blob, url, a;
   try {
-    var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-    var blob = new Blob([wbout], {type:'application/octet-stream'});
-
-    // Metodo 1: msSaveBlob (IE/Edge legado)
-    if(window.navigator && window.navigator.msSaveBlob){
-      window.navigator.msSaveBlob(blob, filename);
-      return;
-    }
-
-    // Metodo 2: showSaveFilePicker (File System Access API — Chrome 86+, sem restricao CSP)
-    if(window.showSaveFilePicker){
-      window.showSaveFilePicker({
-        suggestedName: filename,
-        types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]
-      }).then(function(handle){
-        return handle.createWritable();
-      }).then(function(writable){
-        writable.write(blob);
-        return writable.close();
-      }).catch(function(e){
-        if(e.name !== 'AbortError') _xlsxFallbackDownload(blob, filename);
-      });
-      return;
-    }
-
-    // Metodo 3: Blob URL via Object URL
-    _xlsxFallbackDownload(blob, filename);
-
-  } catch(e){
-    console.error('Download error:', e);
-    alert('Erro ao gerar planilha: ' + e.message);
-  }
-}
-
-function _xlsxFallbackDownload(blob, filename){
-  try {
-    var url = (window.URL || window.webkitURL).createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
+    wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    blob  = new Blob([new Uint8Array(wbout)], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    url   = URL.createObjectURL(blob);
+    a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', filename);
     a.style.display = 'none';
     document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){
-      (window.URL || window.webkitURL).revokeObjectURL(url);
-      if(a.parentNode) a.parentNode.removeChild(a);
-    }, 2000);
-  } catch(e2){
-    // Ultimo recurso: abrir em nova aba
-    var reader = new FileReader();
-    reader.onload = function(){ window.open(reader.result, '_blank'); };
-    reader.readAsDataURL(blob);
+    a.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, view:window}));
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 3000);
+  } catch(e){
+    // Fallback final: CSV
+    console.warn('XLSX falhou, tentando CSV:', e);
+    try {
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var csv = XLSX.utils.sheet_to_csv(ws);
+      var csvBlob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+      var csvUrl  = URL.createObjectURL(csvBlob);
+      var csvA    = document.createElement('a');
+      csvA.setAttribute('href', csvUrl);
+      csvA.setAttribute('download', filename.replace('.xlsx','.csv'));
+      csvA.style.display='none';
+      document.body.appendChild(csvA);
+      csvA.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));
+      setTimeout(function(){ URL.revokeObjectURL(csvUrl); csvA.remove(); }, 3000);
+      _xlsxFeedback('Planilha exportada como CSV (formato xlsx bloqueado pelo navegador).', 'warn');
+    } catch(e2){
+      alert('Nao foi possivel fazer o download. Tente outro navegador.');
+    }
   }
 }
 
