@@ -1782,7 +1782,8 @@ function recalc(){
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>Acumulado: '+acumC+' recorrencias</span><span>meta: '+metaAcumC+'</span></div>'
           +'<div class="progress-bar"><div class="progress-fill'+(c1atingida?' green':'')+'" style="width:'+c1p+'%"></div></div>'
         +'</div>'
-        +'<div class="campanha-val">'+(c1atingida?'+ '+fmt(c1bonus):'faltam '+(6-qtdMrrVend)+' MRR'+(6-qtdMrrVend===1?'':'s'))+'</div>'
+        +'<div class="campanha-val">'+(c1atingida?'+ '+fmt(c1bonus)+' (vendidos)':'acumulado: '+acumC+'/'+metaAcumC)+'</div>'
+        +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">Pagos acumulados: '+acumPagoR+'/'+metaAcumPagoR+(c1bonusReal>0?' ✓ +R$2.000 confirmado':'')+'</div>'
       +'</div>'
       +'<div class="campanha-card '+c2cls+'">'
         +'<div class="campanha-header"><span class="campanha-nome">Campanha 2 — Comissao especial BI</span>'+c2badge+'</div>'
@@ -1888,7 +1889,13 @@ function recalc(){
   // Projecao: sem gatilho — mostra sempre (e apenas projecao)
   // Real: so mostra se 70k pago atingido
   var bonusProjTotal = c1bonus + c2bonus;
-  var bonusRealTotal = gatilhoAtingido ? ((qtdMrrPago>=6?2000:0) + c2bonusPago) : 0;
+  // Bonus real da campanha 1 — usa acumulado de pagos do Q3
+  var MESES_PT_R = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var mesIdxR = MESES_PT_R.indexOf(getMesAno().mes);
+  var metaAcumPagoR = mesIdxR >= 8 ? 18 : mesIdxR >= 7 ? 12 : 6;
+  var acumPagoR = _campanhaCache ? (mesIdxR >= 8 ? _campanhaCache.acumPagoSet : mesIdxR >= 7 ? _campanhaCache.acumPagoAgo : _campanhaCache.acumPagoJul) : qtdMrrPago;
+  var c1bonusReal = acumPagoR >= metaAcumPagoR ? 2000 : 0;
+  var bonusRealTotal = gatilhoAtingido ? (c1bonusReal + c2bonusPago) : 0;
 
   // Bonus qualitativos — sempre mostrar (projeção), bloqueado só no real
   var br=document.getElementById('bonus-rows'); var totB=0;
@@ -1922,7 +1929,7 @@ function recalc(){
   if(tpjS) tpjS.textContent = 'Comissao '+fmt(resProj.total)+' + Campanhas '+fmt(bonusProjTotal)+' + Bonus '+fmt(totB);
   if(trlV) trlV.textContent = fmt(totalRealFinal);
   if(trlS) trlS.textContent = gatilhoAtingido
-    ? 'Comissao '+fmt(resReal.total)+' + Campanhas '+fmt(bonusRealTotal)+' + Bonus '+fmt(totB)
+    ? 'Comissao '+fmt(resReal.total)+' + Campanhas '+fmt(bonusRealTotal)+' + Bonus '+fmt(totB)+(c1bonusReal>0?' (rec. pagas: '+acumPagoR+'/'+metaAcumPagoR+'✓)':' (rec. pagas: '+acumPagoR+'/'+metaAcumPagoR+')')
     : '🔒 Gatilho: R$70.000 pagos — '+fmt(totalPago)+' pagos ate agora';
 
   // Campanha acumulada na aba Metricas
@@ -4010,7 +4017,8 @@ async function calcularCampanhaAcumulada(){
   var mesesQ3 = ['Julho','Agosto','Setembro'];
 
   // Contar recorrencias (MRR>0) vendidas (status Vendido) por mes
-  var recPorMes = {Julho:0, Agosto:0, Setembro:0};
+  var recPorMes      = {Julho:0, Agosto:0, Setembro:0};
+  var recPagosPorMes = {Julho:0, Agosto:0, Setembro:0};
 
   for(var i=0; i<mesesQ3.length; i++){
     var chave = emailKey+'__'+mesesQ3[i]+'_'+ano;
@@ -4020,6 +4028,7 @@ async function calcularCampanhaAcumulada(){
         snap.data().leads.forEach(function(l){
           if(l.status==='Vendido' && ((l.mrrServ||0)>0 || (l.mrrBi||0)>0)){
             recPorMes[mesesQ3[i]]++;
+            if(l.pago==='Pago') recPagosPorMes[mesesQ3[i]]++;
           }
         });
       }
@@ -4035,6 +4044,16 @@ async function calcularCampanhaAcumulada(){
   var bonusAgo = acumAgo >= 12 ? 2000 : 0;
   var bonusSet = acumSet >= 18 ? 2000 : 0;
   var totalBonus = bonusJul + bonusAgo + bonusSet;
+
+  // Acumulado de PAGOS (para comissao confirmada)
+  var acumPagoJul = recPagosPorMes['Julho'];
+  var acumPagoAgo = acumPagoJul + recPagosPorMes['Agosto'];
+  var acumPagoSet = acumPagoAgo + recPagosPorMes['Setembro'];
+
+  var bonusPagoJul = acumPagoJul >= 6  ? 2000 : 0;
+  var bonusPagoAgo = acumPagoAgo >= 12 ? 2000 : 0;
+  var bonusPagoSet = acumPagoSet >= 18 ? 2000 : 0;
+  var totalBonusPago = bonusPagoJul + bonusPagoAgo + bonusPagoSet;
 
   // Mes atual do Q3 para saber o que ja passou
   var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -4052,6 +4071,14 @@ async function calcularCampanhaAcumulada(){
     bonusAgo: bonusAgo,
     bonusSet: bonusSet,
     totalBonus: totalBonus,
+    // Pagos
+    acumPagoJul: acumPagoJul,
+    acumPagoAgo: acumPagoAgo,
+    acumPagoSet: acumPagoSet,
+    bonusPagoJul: bonusPagoJul,
+    bonusPagoAgo: bonusPagoAgo,
+    bonusPagoSet: bonusPagoSet,
+    totalBonusPago: totalBonusPago,
     mesAtualIdx: mesIdx,
     // Acumulado ate o mes atual
     acumAteMesAtual: mesIdx >= 8 ? acumSet : mesIdx >= 7 ? acumAgo : acumJul,
