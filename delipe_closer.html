@@ -737,6 +737,10 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
     <div style="overflow-x:auto"><table class="canal-table" id="receita-table"></table></div></div>
   <div class="card"><div class="sec">Ranking SDR / BDR</div>
     <div id="ranking-sdr"></div></div>
+  <div class="card" id="met-campanha-card" style="display:none">
+    <div class="sec">Campanha de Recorrências — Q3 2026</div>
+    <div id="met-campanha"></div>
+  </div>
 </div>
 
 <!-- ===== COMISSAO ===== -->
@@ -1642,6 +1646,8 @@ function getMetrics(){
 }
 
 function recalc(){
+  // Pre-carregar cache da campanha acumulada (async, nao bloqueia)
+  if(!_campanhaCache) calcularCampanhaAcumulada();
   var m=getMetrics();
 
   // nivel baseado no VALOR PAGO — calculado adiante junto com gatilhoAtingido
@@ -1733,7 +1739,14 @@ function recalc(){
   var leadsPagos      = leads.filter(function(l){return l.status==='Vendido' && l.pago==='Pago';});
   var qtdMrrVend  = leadsVendidos.filter(function(l){return l.mrrServ>0||l.mrrBi>0;}).length;
   var qtdMrrPago  = leadsPagos.filter(function(l){return l.mrrServ>0||l.mrrBi>0;}).length;
-  var c1atingida  = qtdMrrVend>=6;
+  // Campanha 1 — acumulado Q3 progressivo
+  // Usa cache se disponivel, senao usa logica local do mes
+  var MESES_PT_C = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var maC = getMesAno();
+  var mesIdxC = MESES_PT_C.indexOf(maC.mes);
+  var metaAcumC = mesIdxC >= 8 ? 18 : mesIdxC >= 7 ? 12 : 6;
+  var acumC = _campanhaCache ? _campanhaCache.acumAteMesAtual : qtdMrrVend;
+  var c1atingida  = acumC >= metaAcumC;
   var c1bonus     = c1atingida ? 2000 : 0;
 
   // Campanha 2: 80k total -> BI vira fixo 500/BI, 4+ BIs -> 700/BI
@@ -1753,8 +1766,8 @@ function recalc(){
   if(cw){
     // Campanha 1
     var c1cls = c1atingida ? 'atingida' : 'ativa';
-    var c1badge = c1atingida ? '<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(2000)+'</span>' : '<span class="campanha-badge camp-pend">'+qtdMrrVend+'/6 MRRs</span>';
-    var c1p = Math.min((qtdMrrVend/6)*100,100);
+    var c1badge = c1atingida ? '<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(2000)+'</span>' : '<span class="campanha-badge camp-pend">'+acumC+'/'+metaAcumC+' acumulado</span>';
+    var c1p = Math.min((acumC/metaAcumC)*100,100);
     // Campanha 2
     var c2cls = !c2ativa ? 'bloqueada' : (qtdBiVend>=4?'atingida':'ativa');
     var c2badge = !c2ativa
@@ -1764,9 +1777,9 @@ function recalc(){
     cw.innerHTML=
       '<div class="campanha-card '+c1cls+'">'
         +'<div class="campanha-header"><span class="campanha-nome">Campanha 1 — Bonus de recorrencia</span>'+c1badge+'</div>'
-        +'<div class="campanha-desc">Vender 6 ou mais MRRs (Servico + BI) no mes = bonus de R$ 2.000</div>'
+        +'<div class="campanha-desc">Acumulado Q3: '+acumC+'/'+metaAcumC+' recorrencias (meta: 6/mes) = bonus de R$ 2.000</div>'
         +'<div class="campanha-progress">'
-          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>'+qtdMrrVend+' recorrencias vendidas</span><span>meta: 6</span></div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>Acumulado: '+acumC+' recorrencias</span><span>meta: '+metaAcumC+'</span></div>'
           +'<div class="progress-bar"><div class="progress-fill'+(c1atingida?' green':'')+'" style="width:'+c1p+'%"></div></div>'
         +'</div>'
         +'<div class="campanha-val">'+(c1atingida?'+ '+fmt(c1bonus):'faltam '+(6-qtdMrrVend)+' MRR'+(6-qtdMrrVend===1?'':'s'))+'</div>'
@@ -1911,6 +1924,44 @@ function recalc(){
   if(trlS) trlS.textContent = gatilhoAtingido
     ? 'Comissao '+fmt(resReal.total)+' + Campanhas '+fmt(bonusRealTotal)+' + Bonus '+fmt(totB)
     : '🔒 Gatilho: R$70.000 pagos — '+fmt(totalPago)+' pagos ate agora';
+
+  // Campanha acumulada na aba Metricas
+  var metCard = document.getElementById('met-campanha-card');
+  var metCamp = document.getElementById('met-campanha');
+  if(metCard && metCamp){
+    metCard.style.display='block';
+    calcularCampanhaAcumulada().then(function(cache){
+      if(!cache||!metCamp) return;
+      var rows=[
+        {mes:'Julho',    rec:cache.recJul, acum:cache.acumJul, meta:6,  bonus:cache.bonusJul},
+        {mes:'Agosto',   rec:cache.recAgo, acum:cache.acumAgo, meta:12, bonus:cache.bonusAgo},
+        {mes:'Setembro', rec:cache.recSet, acum:cache.acumSet, meta:18, bonus:cache.bonusSet},
+      ];
+      metCamp.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px">'
+        +'<thead><tr style="color:rgba(255,255,255,.4);font-size:11px;text-transform:uppercase;letter-spacing:.06em">'
+        +'<th style="padding:6px 0;text-align:left">Mês</th>'
+        +'<th style="padding:6px 8px;text-align:center">Rec. no mês</th>'
+        +'<th style="padding:6px 8px;text-align:center">Acumulado</th>'
+        +'<th style="padding:6px 8px;text-align:center">Meta</th>'
+        +'<th style="padding:6px 8px;text-align:right">Bônus</th>'
+        +'</tr></thead><tbody>'
+        +rows.map(function(r){
+          var cor=r.bonus>0?'#1baf7a':r.acum>0?'#ff9940':'rgba(255,255,255,.3)';
+          return '<tr style="border-top:.5px solid rgba(255,255,255,.06)">'
+            +'<td style="padding:8px 0;color:#fff;font-weight:500">'+r.mes+'</td>'
+            +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.7)">'+r.rec+'</td>'
+            +'<td style="padding:8px;text-align:center;color:'+cor+';font-weight:700">'+r.acum+' / '+r.meta+'</td>'
+            +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.4)">≥ '+r.meta+'</td>'
+            +'<td style="padding:8px;text-align:right;font-weight:700;color:'+(r.bonus>0?'#1baf7a':'rgba(255,255,255,.25)')+'">'+(r.bonus>0?'+ R$ 2.000':'—')+'</td>'
+          +'</tr>';
+        }).join('')
+        +'</tbody></table>'
+        +'<div style="margin-top:14px;padding:10px 14px;background:rgba(255,107,0,.08);border:.5px solid rgba(255,107,0,.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center">'
+          +'<span style="font-size:12px;color:rgba(255,255,255,.5)">Total de bônus Q3 ganho</span>'
+          +'<span style="font-size:18px;font-weight:800;color:'+(cache.totalBonus>0?'#1baf7a':'rgba(255,255,255,.3)')+'">R$ '+cache.totalBonus.toLocaleString('pt-BR')+'</span>'
+        +'</div>';
+    });
+  }
 }
 
 function mc(lbl,val,sub,tipo){
@@ -3589,9 +3640,8 @@ async function carregarHome(){
     var metaProporcional = metaMensal * mesesSel.length;
     var labelMeta = mesesSel.length > 1 ? 'acumulado ('+mesesSel.length+' meses)' : 'mensal';
     _renderHomeCards(totalComb, totalPago, metaProporcional, labelMeta);
-    var dadosCamp = _calcCampanha(leadsMulti);
-    var metaRecMeses = 6 * mesesSel.length;
-    _renderCampanha(dadosCamp, metaRecMeses, labelMeta+' ('+metaRecMeses+' recorrências)');
+    // Campanha acumulada Q3 — sempre busca os 3 meses independente do seletor
+    calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
 
   } else {
     // Trimestre — carregar 3 meses
@@ -3632,8 +3682,8 @@ async function carregarHome(){
         }
       }
     } catch(e){ console.warn('camp tri err',e); }
-    var dadosCampTri = _calcCampanha(leadsTri);
-    _renderCampanha(dadosCampTri, 18, 'trimestral (18 recorrências)');
+    // Campanha acumulada Q3
+    calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
   }
 
   if(isAdmin && _homeUserView==='time'){
@@ -3942,6 +3992,114 @@ function alterarStatusServico(cnpj, si, novoStatus){
   _carteiraData[cnpj].servicos[si].statusServico = novoStatus;
   renderCarteira();
   _salvarCarteira();
+}
+
+
+// ==================== CAMPANHA ACUMULADA Q3 ====================
+// Trimestre fixo Q3: Julho, Agosto, Setembro
+// Regra: a cada mês, bonus de R$2.000 se acumulado >= mesesPassados * 6
+// Ex: Ago -> acumulado Jul+Ago >= 12 -> ganhou; Set -> acumulado >= 18 -> ganhou
+
+var _campanhaCache = null; // { recJul, recAgo, recSet, acumAteJul, acumAteAgo, acumAteSet, bonusJul, bonusAgo, bonusSet, totalBonus, mesAtual }
+
+async function calcularCampanhaAcumulada(){
+  if(!currentUser || !window._fb) return null;
+  var fb = window._fb;
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var ano = '2026';
+  var mesesQ3 = ['Julho','Agosto','Setembro'];
+
+  // Contar recorrencias (MRR>0) vendidas (status Vendido) por mes
+  var recPorMes = {Julho:0, Agosto:0, Setembro:0};
+
+  for(var i=0; i<mesesQ3.length; i++){
+    var chave = emailKey+'__'+mesesQ3[i]+'_'+ano;
+    try {
+      var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
+      if(snap.exists() && snap.data().leads){
+        snap.data().leads.forEach(function(l){
+          if(l.status==='Vendido' && ((l.mrrServ||0)>0 || (l.mrrBi||0)>0)){
+            recPorMes[mesesQ3[i]]++;
+          }
+        });
+      }
+    } catch(e){ /* mes sem dados */ }
+  }
+
+  // Acumulado progressivo e bonus por mes
+  var acumJul = recPorMes['Julho'];
+  var acumAgo = acumJul + recPorMes['Agosto'];
+  var acumSet = acumAgo + recPorMes['Setembro'];
+
+  var bonusJul = acumJul >= 6  ? 2000 : 0;
+  var bonusAgo = acumAgo >= 12 ? 2000 : 0;
+  var bonusSet = acumSet >= 18 ? 2000 : 0;
+  var totalBonus = bonusJul + bonusAgo + bonusSet;
+
+  // Mes atual do Q3 para saber o que ja passou
+  var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var ma = getMesAno();
+  var mesIdx = MESES_PT.indexOf(ma.mes); // 6=Jul, 7=Ago, 8=Set
+
+  _campanhaCache = {
+    recJul: recPorMes['Julho'],
+    recAgo: recPorMes['Agosto'],
+    recSet: recPorMes['Setembro'],
+    acumJul: acumJul,
+    acumAgo: acumAgo,
+    acumSet: acumSet,
+    bonusJul: bonusJul,
+    bonusAgo: bonusAgo,
+    bonusSet: bonusSet,
+    totalBonus: totalBonus,
+    mesAtualIdx: mesIdx,
+    // Acumulado ate o mes atual
+    acumAteMesAtual: mesIdx >= 8 ? acumSet : mesIdx >= 7 ? acumAgo : acumJul,
+    metaAteMesAtual: mesIdx >= 8 ? 18 : mesIdx >= 7 ? 12 : 6,
+    bonusAteMesAtual: mesIdx >= 8 ? (bonusJul+bonusAgo+bonusSet) : mesIdx >= 7 ? (bonusJul+bonusAgo) : bonusJul,
+  };
+  return _campanhaCache;
+}
+
+function renderCampanhaAcumuladaHome(cache){
+  var wrap = document.getElementById('home-campanha-wrap');
+  if(!wrap || !cache) return;
+
+  var pct = cache.metaAteMesAtual > 0 ? Math.min(100, Math.round(cache.acumAteMesAtual / cache.metaAteMesAtual * 100)) : 0;
+  var meses = [
+    {nome:'Julho', rec:cache.recJul, acum:cache.acumJul, meta:6,  bonus:cache.bonusJul},
+    {nome:'Agosto', rec:cache.recAgo, acum:cache.acumAgo, meta:12, bonus:cache.bonusAgo},
+    {nome:'Setembro', rec:cache.recSet, acum:cache.acumSet, meta:18, bonus:cache.bonusSet},
+  ];
+
+  var mesesHtml = meses.map(function(m){
+    var atingiu = m.bonus > 0;
+    var futuro = (m.nome==='Agosto' && cache.mesAtualIdx < 7) || (m.nome==='Setembro' && cache.mesAtualIdx < 8);
+    var cor = atingiu ? '#1baf7a' : futuro ? 'rgba(255,255,255,.2)' : '#e34948';
+    var bg  = atingiu ? 'rgba(27,175,122,.12)' : futuro ? 'rgba(255,255,255,.04)' : 'rgba(227,73,72,.08)';
+    var bdr = atingiu ? 'rgba(27,175,122,.3)' : futuro ? 'rgba(255,255,255,.08)' : 'rgba(227,73,72,.3)';
+    var icon = atingiu ? '✓' : futuro ? '—' : '✗';
+    return '<div style="flex:1;min-width:90px;background:'+bg+';border:.5px solid '+bdr+';border-radius:10px;padding:10px 12px;text-align:center">'
+      +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">'+m.nome+'</div>'
+      +'<div style="font-size:20px;font-weight:800;color:'+cor+'">'+m.rec+'</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.3)">acum: '+m.acum+'/'+m.meta+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:'+cor+';margin-top:4px">'+icon+' '+(atingiu?'R$ 2.000':futuro?'pendente':'sem bônus')+'</div>'
+    +'</div>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="home-campanha-card">'
+    +'<div class="hcc-label"><span class="hcc-trophy">🏆</span> Campanha de Recorrências — Q3 2026</div>'
+    +'<div class="hcc-meta">Acumulado progressivo · <strong style="color:#ff9940">6/mês = R$ 2.000 de bônus</strong> · máx R$ 6.000 no tri</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+mesesHtml+'</div>'
+    +'<div class="hcc-bar-wrap"><div class="hcc-bar-inner'+(pct>=100?' full':'')+'" style="width:'+pct+'%"></div></div>'
+    +'<div class="hcc-pct-row" style="margin-bottom:10px">'
+      +'<span style="color:'+(pct>=100?'#1baf7a':'#ff9940')+';font-weight:700">Acumulado: '+cache.acumAteMesAtual+' / '+cache.metaAteMesAtual+' recorrências ('+pct+'%)</span>'
+      +'<span style="color:rgba(255,255,255,.4);font-weight:700">Bônus ganho: R$ '+cache.bonusAteMesAtual.toLocaleString('pt-BR')+'</span>'
+    +'</div>'
+    +(cache.totalBonus>0
+      ? '<div style="padding:8px 14px;background:rgba(27,175,122,.12);border:.5px solid rgba(27,175,122,.3);border-radius:8px;font-size:12px;color:#1baf7a;font-weight:600;text-align:center">🎉 Total de bônus no Q3: R$ '+cache.totalBonus.toLocaleString('pt-BR')+' / R$ 6.000</div>'
+      : '')
+  +'</div>';
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
