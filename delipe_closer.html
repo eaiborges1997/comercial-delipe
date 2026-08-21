@@ -677,11 +677,19 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
       <span style="font-size:11px;color:rgba(255,255,255,.35);font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;margin-right:2px">Filtrar:</span>
       <select id="filtro-status" onchange="renderLeads()" style="width:auto;font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;outline:none">
         <option value="">Status ▾</option>
-        <option value="Em andamento">Em andamento</option>
+        <option value="Novo Lead">Novo Lead</option>
+        <option value="Contato Feito">Contato Feito</option>
+        <option value="Respondeu">Respondeu</option>
+        <option value="Inicial Agendada">Inicial Agendada</option>
+        <option value="Inicial No-Show">Inicial No-Show</option>
+        <option value="Telefone Invalido">Telefone Invalido</option>
+        <option value="Nao e Provedor">Nao e Provedor</option>
+        <option value="Declinou">Declinou</option>
+        <option value="Cortesia">Cortesia</option>
         <option value="Em negociacao">Em negociacao</option>
-        <option value="Vendido">Vendido</option>
-        <option value="Nao avancou">Nao avancou</option>
+        <option value="Negociacao">Negociacao</option>
         <option value="Nao convertido">Nao convertido</option>
+        <option value="Vendido">Vendido</option>
       </select>
       <select id="filtro-inicial" onchange="renderLeads()" style="width:auto;font-size:12px;padding:5px 10px;border:.5px solid rgba(255,255,255,.15);border-radius:20px;background:rgba(255,255,255,.06);color:#fff;font-family:Inter,sans-serif;cursor:pointer;outline:none">
         <option value="">Inicial ▾</option>
@@ -1079,7 +1087,7 @@ var STATUS_REUNIAO_INICIAL  = ['—','Realizada/Avancou','Realizada/Nao avancou'
 var STATUS_REUNIAO_PROPOSTA = ['—','Realizada','Venda em ligacao','Proposta No-show','Cancelada','Aguardando nova data'];
 var STATUS_REUNIAO_FOLLOWUP = ['—','Realizada','Venda em ligacao','Follow-up No-show','Cancelada','Aguardando nova data'];
 var STATUS_REUNIAO = STATUS_REUNIAO_PROPOSTA; // alias nao usado
-var STATUS_LEAD    = ['Em andamento','Vendido','Nao avancou','Em negociacao','Nao convertido'];
+var STATUS_LEAD = ['Novo Lead','Contato Feito','Respondeu','Inicial Agendada','Inicial No-Show','Telefone Invalido','Nao e Provedor','Declinou','Cortesia','Em negociacao','Nao convertido','Negociacao','Vendido'];
 var QUALIFICACOES  = ['Qualificado+','Qualificado','Desqualificado','Nao e provedor'];
 var CONTRATO_ST    = ['Sem contrato','Nao assinado','Ag assinatura','Em revisao','Assinado'];
 
@@ -1160,7 +1168,7 @@ function duplicarLead(id){
   copia.id=++leadId;
   copia.empresa=orig.empresa+' (copia)';
   copia.dtContrato=''; copia.dtPagamento='';
-  copia.status='Em andamento'; copia.contrato='Nao assinado';
+  copia.status='Novo Lead'; copia.contrato='Nao assinado';
   copia.pago='Ag pagamento';
   copia.mrrServ=0; copia.mrrBi=0; copia.evento=0; copia.impl=0; copia.produto=0;
   copia.obs='';
@@ -1206,11 +1214,25 @@ function qualBadge(q){
   return '<span class="qual-badge '+m[0]+'">'+m[1]+'</span>';
 }
 function statusTag(s){
-  var map={
-    'Vendido':'tag-vendido','Em negociacao':'tag-negoc','Nao convertido':'tag-naoconv',
-    'Em andamento':'tag-andamento','Nao avancou':'tag-naoav'
+  var colors={
+    'Novo Lead':        'background:#00bcd4;color:#fff',
+    'Contato Feito':    'background:#26a69a;color:#fff',
+    'Respondeu':        'background:#5c6bc0;color:#fff',
+    'Inicial Agendada': 'background:#3f51b5;color:#fff',
+    'Inicial No-Show':  'background:#ff7043;color:#fff',
+    'Telefone Invalido':'background:#6d4c41;color:#fff',
+    'Nao e Provedor':   'background:#fdd835;color:#333',
+    'Declinou':         'background:#e53935;color:#fff',
+    'Cortesia':         'background:#ffca28;color:#333',
+    'Em negociacao':    'background:#26c6da;color:#fff',
+    'Nao convertido':   'background:#ef5350;color:#fff',
+    'Negociacao':       'background:#00acc1;color:#fff',
+    'Vendido':          'background:#1baf7a;color:#fff',
+    'Em andamento':     'background:#ff9940;color:#fff',
+    'Nao avancou':      'background:#e34948;color:#fff',
   };
-  return '<span class="lead-tag '+(map[s]||'tag-andamento')+'">'+s+'</span>';
+  var style = colors[s] || 'background:rgba(255,255,255,.12);color:rgba(255,255,255,.7)';
+  return '<span class="lead-tag" style="'+style+';padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap">'+s+'</span>';
 }
 function canalTag(c){ return '<span class="lead-canal-tag">'+c+'</span>'; }
 
@@ -4209,7 +4231,7 @@ function exportarModeloXLSX(){
   var CLOSERS_LISTA = ['Lucas','David','Sabrina','Gabriel','Cleiton','Greison','Danilo','Mauricio'];
   var SERVICOS_LISTA= SERVICOS.length > 0 ? SERVICOS : ['Assessoria Comercial','BI','Delipe One','Diag 360','Site'];
   var CANAIS_LISTA  = ['Trafego Pago','Indicacao','Base','Evento','SDR','Outbound'];
-  var STATUS_LISTA  = ['Em andamento','Em negociacao','Vendido','Perdido'];
+  var STATUS_LISTA  = ['Novo Lead','Contato Feito','Respondeu','Inicial Agendada','Inicial No-Show','Telefone Invalido','Nao e Provedor','Declinou','Cortesia','Em negociacao','Negociacao','Nao convertido','Vendido'];
   var PAGO_LISTA    = ['Ag pagamento','Pago','Atrasado','Nao se aplica'];
   var QUAL_LISTA    = ['—','Qualificado','Qualificado+','Nao qualificado'];
   var ST_INIC_LISTA = ['—','Realizada/Avancou','Realizada/Nao avancou','Venda em ligacao','Inicial No-show','Cancelada','Aguardando nova data'];
@@ -4435,7 +4457,7 @@ function _xlsxMostrarPreview(erros){
       +'</tr></thead><tbody>';
 
     _xlsxLeadsPendentes.forEach(function(l, i){
-      var cor = l.status==='Vendido'?'#1baf7a':l.status==='Em andamento'?'#ff9940':'rgba(255,255,255,.5)';
+      var cor = l.status==='Vendido'?'#1baf7a':['Novo Lead','Contato Feito','Respondeu','Inicial Agendada','Cortesia','Em negociacao','Negociacao'].indexOf(l.status)>=0?'#ff9940':'rgba(255,255,255,.5)';
       html += '<tr style="border-bottom:.5px solid rgba(255,255,255,.06)">'
         +'<td style="padding:6px 8px;color:rgba(255,255,255,.35)">'+(i+1)+'</td>'
         +'<td style="padding:6px 8px;color:#fff;font-weight:500">'+l.empresa+'</td>'
