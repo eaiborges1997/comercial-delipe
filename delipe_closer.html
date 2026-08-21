@@ -465,6 +465,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
     return signOut(auth);
   };
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <!-- TELA DE LOGIN -->
@@ -1019,6 +1020,34 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
     <button class="export-btn" onclick="exportarPDF()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
       Exportar PDF</button>
+  </div>
+</div>
+
+<div style="margin-top:1rem">
+  <div class="export-card" style="flex-direction:column;align-items:flex-start;gap:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:10px">
+      <div class="export-info">
+        <h3>Importar / Exportar Planilha</h3>
+        <p>Baixe o modelo, preencha e importe para cadastrar leads em lote.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="export-btn" onclick="exportarModeloXLSX()" style="background:rgba(27,175,122,.15);border:.5px solid rgba(27,175,122,.4);color:#1baf7a;gap:8px;padding:10px 16px;font-size:13px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Baixar modelo .xlsx
+        </button>
+        <label class="export-btn" style="cursor:pointer;gap:8px;padding:10px 16px;font-size:13px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10" transform="rotate(180 12 12)"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importar planilha
+          <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarXLSX(this)">
+        </label>
+      </div>
+    </div>
+    <div id="xlsx-feedback" style="display:none;width:100%;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+    <div id="xlsx-preview" style="display:none;width:100%;overflow-x:auto"></div>
+    <div id="xlsx-import-btn-wrap" style="display:none">
+      <button onclick="confirmarImportXLSX()" style="padding:9px 20px;background:#ff6b00;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">Confirmar importação</button>
+      <button onclick="cancelarImportXLSX()" style="padding:9px 16px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:Inter,sans-serif;margin-left:8px">Cancelar</button>
+    </div>
   </div>
 </div>
 <footer>Delipe &mdash; fazendo historia.</footer>
@@ -4127,6 +4156,324 @@ function renderCampanhaAcumuladaHome(cache){
       ? '<div style="padding:8px 14px;background:rgba(27,175,122,.12);border:.5px solid rgba(27,175,122,.3);border-radius:8px;font-size:12px;color:#1baf7a;font-weight:600;text-align:center">🎉 Total de bônus no Q3: R$ '+cache.totalBonus.toLocaleString('pt-BR')+' / R$ 6.000</div>'
       : '')
   +'</div>';
+}
+
+
+// ==================== IMPORTAR / EXPORTAR XLSX ====================
+
+// Colunas do modelo — ordem e nomes exatos
+var XLSX_COLS = [
+  {key:'empresa',       label:'Empresa',              exemplo:'Fibra Prime LTDA'},
+  {key:'cnpj',          label:'CNPJ',                 exemplo:'12.345.678/0001-99'},
+  {key:'contatoNome',   label:'Contato Nome',         exemplo:'João Silva'},
+  {key:'contatoTel',    label:'Contato Telefone',     exemplo:'(11) 99999-9999'},
+  {key:'contatoEmail',  label:'Contato Email',        exemplo:'joao@fibraprime.com'},
+  {key:'cargo',         label:'Cargo',                exemplo:'CEO'},
+  {key:'qualificacao',  label:'Qualificacao',         exemplo:'Qualificado+'},
+  {key:'canal',         label:'Canal',                exemplo:'Trafego Pago'},
+  {key:'sdr',           label:'SDR',                  exemplo:'LUCAS'},
+  {key:'closer',        label:'Closer',               exemplo:'Lucas'},
+  {key:'servico',       label:'Servico',              exemplo:'Assessoria Comercial'},
+  {key:'dtAgendamento', label:'Dt Agendamento',       exemplo:'2026-08-01'},
+  {key:'dtInicial',     label:'Dt Reuniao Inicial',   exemplo:'2026-08-05'},
+  {key:'statusInicial', label:'Status Inicial',       exemplo:'Realizada/Avancou'},
+  {key:'dtProposta',    label:'Dt Proposta',          exemplo:'2026-08-10'},
+  {key:'statusProposta',label:'Status Proposta',      exemplo:'Realizada'},
+  {key:'dtFollowup',    label:'Dt Follow-up',         exemplo:'2026-08-15'},
+  {key:'statusFollowup',label:'Status Follow-up',     exemplo:'Realizada'},
+  {key:'status',        label:'Status',               exemplo:'Vendido'},
+  {key:'pago',          label:'Pagamento',            exemplo:'Pago'},
+  {key:'dtPagamento',   label:'Dt Pagamento',         exemplo:'2026-08-20'},
+  {key:'mrrServ',       label:'MRR Servico (R$)',     exemplo:'5500'},
+  {key:'mrrBi',         label:'MRR BI (R$)',          exemplo:'0'},
+  {key:'impl',          label:'Implantacao (R$)',      exemplo:'6000'},
+  {key:'produto',       label:'Produto (R$)',          exemplo:'0'},
+  {key:'evento',        label:'Evento (R$)',           exemplo:'0'},
+  {key:'projetoPersonalizado', label:'Proj Personalizado (R$)', exemplo:'0'},
+  {key:'obs',           label:'Observacoes',          exemplo:'Importado via planilha'},
+];
+
+var _xlsxLeadsPendentes = [];  // leads parsed aguardando confirmação
+
+function exportarModeloXLSX(){
+  if(typeof XLSX === 'undefined'){
+    alert('Biblioteca XLSX ainda carregando. Aguarde alguns segundos e tente novamente.');
+    return;
+  }
+  var wb = XLSX.utils.book_new();
+
+  // ---- Aba Listas (usada para dropdown no Excel via data validation) ----
+  // Cada coluna tem uma lista de valores — Excel limita formula a 255 chars
+  // então colocamos as listas em células e referenciamos via INDIRECT
+  var SDRS_LISTA    = ['LUCAS','ADRIELLE','CLEITO','PAULO','VINI','DAVID','SABRINA','GABRIEL','CLEITON','GREISON','DANILO','MAURICIO','OUTRO'];
+  var CLOSERS_LISTA = ['Lucas','David','Sabrina','Gabriel','Cleiton','Greison','Danilo','Mauricio'];
+  var SERVICOS_LISTA= SERVICOS.length > 0 ? SERVICOS : ['Assessoria Comercial','BI','Delipe One','Diag 360','Site'];
+  var CANAIS_LISTA  = ['Trafego Pago','Indicacao','Base','Evento','SDR','Outbound'];
+  var STATUS_LISTA  = ['Em andamento','Em negociacao','Vendido','Perdido'];
+  var PAGO_LISTA    = ['Ag pagamento','Pago','Atrasado','Nao se aplica'];
+  var QUAL_LISTA    = ['—','Qualificado','Qualificado+','Nao qualificado'];
+  var ST_INIC_LISTA = ['—','Realizada/Avancou','Realizada/Nao avancou','Venda em ligacao','Inicial No-show','Cancelada','Aguardando nova data'];
+  var ST_PROP_LISTA = ['—','Realizada','Venda em ligacao','Proposta No-show','Cancelada','Aguardando nova data'];
+  var ST_FOLL_LISTA = ['—','Realizada','Venda em ligacao','Follow-up No-show','Cancelada','Aguardando nova data'];
+
+  // Montar aba Listas com cada lista em uma coluna
+  var listaCols = [
+    {titulo:'SDR',           valores:SDRS_LISTA},
+    {titulo:'Closer',        valores:CLOSERS_LISTA},
+    {titulo:'Servico',       valores:SERVICOS_LISTA},
+    {titulo:'Canal',         valores:CANAIS_LISTA},
+    {titulo:'Status',        valores:STATUS_LISTA},
+    {titulo:'Pagamento',     valores:PAGO_LISTA},
+    {titulo:'Qualificacao',  valores:QUAL_LISTA},
+    {titulo:'St Inicial',    valores:ST_INIC_LISTA},
+    {titulo:'St Proposta',   valores:ST_PROP_LISTA},
+    {titulo:'St Follow-up',  valores:ST_FOLL_LISTA},
+  ];
+
+  var maxRows = 0;
+  listaCols.forEach(function(lc){ if(lc.valores.length > maxRows) maxRows = lc.valores.length; });
+
+  var listaData = [listaCols.map(function(lc){ return lc.titulo; })];
+  for(var r=0; r<maxRows; r++){
+    listaData.push(listaCols.map(function(lc){ return lc.valores[r] || ''; }));
+  }
+  var wsListas = XLSX.utils.aoa_to_sheet(listaData);
+  wsListas['!cols'] = listaCols.map(function(){ return {wch:22}; });
+  XLSX.utils.book_append_sheet(wb, wsListas, 'Listas');
+
+  // ---- Aba Leads (modelo principal) ----
+  var headers = XLSX_COLS.map(function(c){ return c.label; });
+  var exemplo  = XLSX_COLS.map(function(c){ return c.exemplo; });
+
+  // Preencher 50 linhas vazias para as dropdowns funcionarem
+  var wsData = [headers, exemplo];
+  for(var i=0;i<49;i++) wsData.push(XLSX_COLS.map(function(){ return ''; }));
+
+  var ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = XLSX_COLS.map(function(c){ return {wch: Math.max(c.label.length+4, 18)}; });
+
+  // Data validations (dropdowns) — referencia as listas da aba Listas
+  // Formato: {sqref: "C2:C100", formulas1: "Listas!$C$2:$C$20"}
+  // Mapeamento coluna Excel → coluna da aba Listas (1-indexed)
+  var colMap = {
+    'SDR':           {listaCol:'A', max: SDRS_LISTA.length},
+    'Closer':        {listaCol:'B', max: CLOSERS_LISTA.length},
+    'Servico':       {listaCol:'C', max: SERVICOS_LISTA.length},
+    'Canal':         {listaCol:'D', max: CANAIS_LISTA.length},
+    'Status':        {listaCol:'E', max: STATUS_LISTA.length},
+    'Pagamento':     {listaCol:'F', max: PAGO_LISTA.length},
+    'Qualificacao':  {listaCol:'G', max: QUAL_LISTA.length},
+    'Status Inicial':{listaCol:'H', max: ST_INIC_LISTA.length},
+    'Status Proposta':{listaCol:'I', max: ST_PROP_LISTA.length},
+    'Status Follow-up':{listaCol:'J', max: ST_FOLL_LISTA.length},
+  };
+
+  var dataValidations = [];
+  XLSX_COLS.forEach(function(c, ci){
+    var map = colMap[c.label];
+    if(!map) return;
+    var excelCol = XLSX.utils.encode_col(ci);
+    dataValidations.push({
+      type: 'list',
+      allowBlank: true,
+      sqref: excelCol+'2:'+excelCol+'100',
+      formulas: ['Listas!$'+map.listaCol+'$2:$'+map.listaCol+'$'+(map.max+1)]
+    });
+  });
+
+  if(dataValidations.length > 0){
+    ws['!dataValidation'] = dataValidations;
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+
+  // Reordenar abas: Leads primeiro, Listas por trás
+  wb.SheetNames = ['Leads','Listas'];
+
+  // ---- Aba Instrucoes ----
+  var instrData = [
+    ['INSTRUCOES DE PREENCHIMENTO'],
+    [''],
+    ['1. Preencha a aba "Leads" a partir da linha 3 (linha 2 é exemplo, pode apagar)'],
+    ['2. Campos com seta ▼ nas células têm lista de opções — clique para selecionar'],
+    ['3. Datas: use o formato AAAA-MM-DD (ex: 2026-08-15) ou selecione pelo calendário do Excel'],
+    ['4. Valores em R$: apenas números sem símbolo (ex: 5500 para R$ 5.500,00)'],
+    ['5. Campos obrigatórios: Empresa'],
+    ['6. Campos opcionais: todos os demais podem ficar em branco'],
+    ['7. Após preencher, salve o arquivo e importe pelo sistema'],
+    [''],
+    ['CAMPOS COM DROPDOWN:'],
+    ['SDR, Closer, Serviço, Canal, Status, Pagamento, Qualificação,'],
+    ['Status Inicial, Status Proposta, Status Follow-up'],
+    [''],
+    ['Os closers e serviços listados refletem os cadastrados no sistema no momento da exportação.'],
+  ];
+  var wsInstr = XLSX.utils.aoa_to_sheet(instrData);
+  wsInstr['!cols'] = [{wch:80}];
+  XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucoes');
+
+  var mesAno = getMesAno();
+  XLSX.writeFile(wb, 'leads_'+mesAno.mes+'_'+mesAno.ano+'.xlsx');
+  _xlsxFeedback('Modelo exportado! Preencha a aba "Leads" e importe de volta.', 'success');
+  setTimeout(function(){ document.getElementById('xlsx-feedback').style.display='none'; }, 5000);
+}
+
+function importarXLSX(input){
+  var file = input.files[0];
+  if(!file) return;
+  if(typeof XLSX === 'undefined'){
+    alert('Biblioteca XLSX ainda carregando. Tente novamente.');
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data, {type:'array', cellDates:true});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+
+      if(rows.length === 0){
+        _xlsxFeedback('Planilha vazia ou sem dados.', 'error');
+        return;
+      }
+
+      // Mapear colunas pelo label
+      var labelToKey = {};
+      XLSX_COLS.forEach(function(c){ labelToKey[c.label] = c.key; });
+
+      _xlsxLeadsPendentes = [];
+      var erros = [];
+
+      rows.forEach(function(row, i){
+        // Pular linha de exemplo se empresa === exemplo
+        if((row['Empresa']||'').toString().trim() === 'Fibra Prime LTDA') return;
+
+        var lead = newLead();
+        lead.id = Date.now() + i;
+
+        XLSX_COLS.forEach(function(c){
+          var val = row[c.label];
+          if(val === undefined || val === null || val === '') return;
+          val = val.toString().trim();
+
+          // Campos numéricos
+          if(['mrrServ','mrrBi','impl','produto','evento','projetoPersonalizado'].indexOf(c.key) >= 0){
+            lead[c.key] = parseFloat(val.replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
+          }
+          // Campos de data
+          else if(['dtAgendamento','dtInicial','dtProposta','dtFollowup','dtPagamento'].indexOf(c.key) >= 0){
+            // Aceita Date object (SheetJS com cellDates) ou string
+            if(val instanceof Date){
+              lead[c.key] = val.toISOString().slice(0,10);
+            } else {
+              lead[c.key] = val;
+            }
+          }
+          else {
+            lead[c.key] = val;
+          }
+        });
+
+        if(!lead.empresa){
+          erros.push('Linha '+(i+2)+': campo Empresa é obrigatório.');
+          return;
+        }
+
+        _xlsxLeadsPendentes.push(lead);
+      });
+
+      if(_xlsxLeadsPendentes.length === 0 && erros.length === 0){
+        _xlsxFeedback('Nenhum lead válido encontrado na planilha.', 'error');
+        return;
+      }
+
+      // Mostrar preview
+      _xlsxMostrarPreview(erros);
+
+    } catch(err){
+      _xlsxFeedback('Erro ao ler o arquivo: '+err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  // Reset input
+  input.value = '';
+}
+
+function _xlsxFeedback(msg, tipo){
+  var el = document.getElementById('xlsx-feedback');
+  if(!el) return;
+  el.style.display = 'block';
+  el.style.background = tipo==='error' ? 'rgba(227,73,72,.12)' : tipo==='warn' ? 'rgba(255,153,64,.12)' : 'rgba(27,175,122,.12)';
+  el.style.border = '.5px solid '+(tipo==='error'?'rgba(227,73,72,.3)':tipo==='warn'?'rgba(255,153,64,.3)':'rgba(27,175,122,.3)');
+  el.style.color  = tipo==='error' ? '#e34948' : tipo==='warn' ? '#ff9940' : '#1baf7a';
+  el.textContent  = msg;
+}
+
+function _xlsxMostrarPreview(erros){
+  var prev = document.getElementById('xlsx-preview');
+  var btnW = document.getElementById('xlsx-import-btn-wrap');
+  if(!prev) return;
+
+  var html = '';
+
+  if(erros.length > 0){
+    html += '<div style="padding:8px 12px;background:rgba(227,73,72,.1);border:.5px solid rgba(227,73,72,.3);border-radius:8px;font-size:12px;color:#e34948;margin-bottom:10px">'
+      +'⚠ '+erros.join('<br>')+'</div>';
+  }
+
+  if(_xlsxLeadsPendentes.length > 0){
+    _xlsxFeedback(_xlsxLeadsPendentes.length+' lead(s) encontrado(s). Revise e confirme a importação.', 'warn');
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">'
+      +'<thead><tr style="background:rgba(255,255,255,.04)">'
+      +'<th style="padding:6px 8px;text-align:left;color:rgba(255,255,255,.4);font-weight:600;border-bottom:.5px solid rgba(255,255,255,.1)">#</th>'
+      +'<th style="padding:6px 8px;text-align:left;color:rgba(255,255,255,.4);font-weight:600;border-bottom:.5px solid rgba(255,255,255,.1)">Empresa</th>'
+      +'<th style="padding:6px 8px;text-align:left;color:rgba(255,255,255,.4);font-weight:600;border-bottom:.5px solid rgba(255,255,255,.1)">Contato</th>'
+      +'<th style="padding:6px 8px;text-align:left;color:rgba(255,255,255,.4);font-weight:600;border-bottom:.5px solid rgba(255,255,255,.1)">Servico</th>'
+      +'<th style="padding:6px 8px;text-align:left;color:rgba(255,255,255,.4);font-weight:600;border-bottom:.5px solid rgba(255,255,255,.1)">Status</th>'
+      +'<th style="padding:6px 8px;text-align:right;color:rgba(255,255,255,.4);font-weight:600;border-bottom:.5px solid rgba(255,255,255,.1)">MRR</th>'
+      +'</tr></thead><tbody>';
+
+    _xlsxLeadsPendentes.forEach(function(l, i){
+      var cor = l.status==='Vendido'?'#1baf7a':l.status==='Em andamento'?'#ff9940':'rgba(255,255,255,.5)';
+      html += '<tr style="border-bottom:.5px solid rgba(255,255,255,.06)">'
+        +'<td style="padding:6px 8px;color:rgba(255,255,255,.35)">'+(i+1)+'</td>'
+        +'<td style="padding:6px 8px;color:#fff;font-weight:500">'+l.empresa+'</td>'
+        +'<td style="padding:6px 8px;color:rgba(255,255,255,.5)">'+l.contatoNome+(l.contatoTel?' · '+l.contatoTel:'')+'</td>'
+        +'<td style="padding:6px 8px;color:rgba(255,255,255,.5)">'+l.servico+'</td>'
+        +'<td style="padding:6px 8px;color:'+cor+'">'+l.status+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;color:rgba(255,255,255,.6)">'+(l.mrrServ||l.mrrBi?(l.mrrServ||0)+(l.mrrBi||0)>0?'R$ '+((l.mrrServ||0)+(l.mrrBi||0)).toLocaleString('pt-BR')+'/mês':'':'—')+'</td>'
+        +'</tr>';
+    });
+    html += '</tbody></table>';
+    if(btnW) btnW.style.display = 'block';
+  } else {
+    if(btnW) btnW.style.display = 'none';
+  }
+
+  prev.style.display = html ? 'block' : 'none';
+  prev.innerHTML = html;
+}
+
+function confirmarImportXLSX(){
+  if(_xlsxLeadsPendentes.length === 0) return;
+  _xlsxLeadsPendentes.forEach(function(l){ leads.push(l); });
+  var n = _xlsxLeadsPendentes.length;
+  _xlsxLeadsPendentes = [];
+  document.getElementById('xlsx-preview').style.display = 'none';
+  document.getElementById('xlsx-import-btn-wrap').style.display = 'none';
+  agendarSalvamento();
+  renderLeads();
+  recalc();
+  _xlsxFeedback('✓ '+n+' lead(s) importado(s) com sucesso! Salvando...', 'success');
+  setTimeout(function(){ document.getElementById('xlsx-feedback').style.display='none'; }, 4000);
+}
+
+function cancelarImportXLSX(){
+  _xlsxLeadsPendentes = [];
+  document.getElementById('xlsx-preview').style.display = 'none';
+  document.getElementById('xlsx-import-btn-wrap').style.display = 'none';
+  document.getElementById('xlsx-feedback').style.display = 'none';
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
