@@ -4217,6 +4217,24 @@ var XLSX_COLS = [
 
 var _xlsxLeadsPendentes = [];  // leads parsed aguardando confirmação
 
+function _downloadXLSX(wb, filename){
+  // Usar Blob URL para contornar restricoes do GitHub Pages
+  try {
+    var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    var blob = new Blob([wbout], {type:'application/octet-stream'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+  } catch(e){
+    // Fallback para writeFile
+    XLSX.writeFile(wb, filename);
+  }
+}
+
 function exportarModeloXLSX(){
   if(typeof XLSX === 'undefined'){
     alert('Biblioteca XLSX ainda carregando. Aguarde alguns segundos e tente novamente.');
@@ -4335,7 +4353,7 @@ function exportarModeloXLSX(){
   XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucoes');
 
   var mesAno = getMesAno();
-  XLSX.writeFile(wb, 'leads_'+mesAno.mes+'_'+mesAno.ano+'.xlsx');
+  _downloadXLSX(wb, 'leads_'+mesAno.mes+'_'+mesAno.ano+'.xlsx');
   _xlsxFeedback('Modelo exportado! Preencha a aba "Leads" e importe de volta.', 'success');
   setTimeout(function(){ document.getElementById('xlsx-feedback').style.display='none'; }, 5000);
 }
