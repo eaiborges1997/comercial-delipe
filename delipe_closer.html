@@ -1693,8 +1693,12 @@ function getMetrics(){
   });
   m.totalCombinado=m.totalMrr+m.totalMrrBi+m.totalEvento+m.totalImpl+m.totalProd+m.totalProj;
   // Conversao: vendas unicas por CNPJ / leads qualificados (Qualificado + Qualificado+)
+  // Denominador da conversao:
+  // Qualificado + Qualificado+ + Desqualificado que foi Vendido e Pago
   var leadsQual = leads.filter(function(l){
-    return l.qualificacao==='Qualificado' || l.qualificacao==='Qualificado+';
+    if(l.qualificacao==='Qualificado' || l.qualificacao==='Qualificado+') return true;
+    if(l.qualificacao==='Desqualificado' && l.status==='Vendido' && l.pago==='Pago') return true;
+    return false;
   }).length;
   // Vendas unicas: deduplicar por CNPJ (mesmo CNPJ = 1 venda)
   var cnpjsVendidos = {};
@@ -1784,9 +1788,11 @@ function recalc(){
     var canalQual = {};
     leads.forEach(function(l){
       var c = l.canal || '—';
-      if(!canalQual[c]) canalQual[c]={qual:0,qualp:0};
-      if(l.qualificacao==='Qualificado') canalQual[c].qual++;
-      if(l.qualificacao==='Qualificado+') canalQual[c].qualp++;
+      if(!canalQual[c]) canalQual[c]={qual:0,qualp:0,denomConv:0};
+      if(l.qualificacao==='Qualificado'){ canalQual[c].qual++; canalQual[c].denomConv++; }
+      if(l.qualificacao==='Qualificado+'){ canalQual[c].qualp++; canalQual[c].denomConv++; }
+      // Desqualificado vendido e pago entra no denominador
+      if(l.qualificacao==='Desqualificado' && l.status==='Vendido' && l.pago==='Pago') canalQual[c].denomConv++;
     });
     var tQ=0,tQp=0;
     var thStyle='padding:6px 10px;text-align:left;color:rgba(255,255,255,.4);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-bottom:.5px solid rgba(255,255,255,.1)';
@@ -1804,7 +1810,8 @@ function recalc(){
       var d=m.canais[c]||{leads:0,vendidos:0};
       var q=canalQual[c]||{qual:0,qualp:0};
       tL+=d.leads; tV+=d.vendidos; tQ+=q.qual; tQp+=q.qualp;
-      var conv = d.leads>0?(d.vendidos/d.leads*100).toFixed(0)+'%':'--';
+      var denom = q.denomConv||0;
+      var conv = denom>0?(d.vendidos/denom*100).toFixed(0)+'%':'--';
       return '<tr>'
         +'<td style="'+tdS+';font-weight:500">'+c+'</td>'
         +'<td style="'+tdS+';text-align:center">'+d.leads+'</td>'
