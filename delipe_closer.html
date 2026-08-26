@@ -115,7 +115,13 @@ textarea{resize:vertical;min-height:60px}
 
 /* METRICAS */
 .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem}
-.metric-card{background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.08);border-radius:10px;padding:1rem}
+.metric-card{background:rgba(255,255,255,.05);border:.5px solid rgba(255,255,255,.08);border-radius:10px;padding:1rem;cursor:default;transition:border-color .15s,background .15s}
+.metric-card:hover{border-color:rgba(255,255,255,.18)!important;background:rgba(255,255,255,.07)!important}
+.mc-tooltip{display:none;position:absolute;z-index:9999;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#180d30;border:.5px solid rgba(255,107,0,.35);border-radius:10px;padding:10px 14px;min-width:180px;max-width:260px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.6);pointer-events:none}
+.mc-tooltip-title{font-size:10px;font-weight:700;color:#ff9940;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;border-bottom:.5px solid rgba(255,255,255,.08);padding-bottom:4px}
+.mc-tooltip-item{font-size:12px;color:rgba(255,255,255,.8);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-tooltip-empty{font-size:12px;color:rgba(255,255,255,.3);font-style:italic}
+.metric-card:hover .mc-tooltip{display:block}
 .metric-card.orange{background:rgba(255,107,0,.07);border-color:rgba(255,107,0,.2)}
 .metric-card.green{background:rgba(27,175,122,.07);border-color:rgba(27,175,122,.2)}
 .metric-card.blue{background:rgba(42,120,214,.07);border-color:rgba(42,120,214,.2)}
@@ -1639,21 +1645,41 @@ function getMetrics(){
   CANAIS.forEach(function(c){m.canais[c]={leads:0,vendidos:0,mrr:0,mrrbi:0,impl:0};});
   SDRS.forEach(function(s){m.sdrs[s]={total:0,inicial:0,proposta:0};});
 
+  // Listas de empresas por metrica (para tooltip)
+  m.listInicialReal=[]; m.listPropostaReal=[]; m.listFollowReal=[];
+  m.listNoshow=[]; m.listVendidos=[]; m.listPagos=[]; m.listQualp=[]; m.listQual=[];
+  m.listDesq=[]; m.listContratos=[];
+
   leads.forEach(function(l){
+    var emp = l.empresa || '(sem nome)';
     var c=m.canais[l.canal]||(m.canais[l.canal]={leads:0,vendidos:0,mrr:0,mrrbi:0,impl:0});
     c.leads++;
-    if(l.statusInicial==='Realizada') m.inicialReal++;
-    if(l.statusProposta==='Realizada') m.propostaReal++;
-    if(l.statusFollowup==='Realizada') m.followReal++;
-    if(l.statusInicial==='Inicial No-show'||l.statusProposta==='Proposta No-show') m.noshow++;
-    if(l.contrato==='Assinado') m.contratosAssin++;
-    if(l.pago==='Pago') m.pagos++;
-    if(l.qualificacao==='Qualificado+') m.qualp++;
-    else if(l.qualificacao==='Qualificado') m.qual++;
+    // Iniciais realizadas: Realizada/Avancou OU Realizada/Nao avancou
+    if(l.statusInicial==='Realizada/Avancou'||l.statusInicial==='Realizada/Nao avancou'){
+      m.inicialReal++;
+      m.listInicialReal.push(emp+' ('+l.statusInicial+')');
+    }
+    if(l.statusProposta==='Realizada'||l.statusProposta==='Venda em ligacao'){
+      m.propostaReal++;
+      m.listPropostaReal.push(emp);
+    }
+    if(l.statusFollowup==='Realizada'||l.statusFollowup==='Venda em ligacao'){
+      m.followReal++;
+      m.listFollowReal.push(emp);
+    }
+    if(l.statusInicial==='Inicial No-show'||l.statusProposta==='Proposta No-show'||l.statusFollowup==='Follow-up No-show'){
+      m.noshow++;
+      m.listNoshow.push(emp);
+    }
+    if(l.contrato==='Assinado'){ m.contratosAssin++; m.listContratos.push(emp); }
+    if(l.pago==='Pago'){ m.pagos++; m.listPagos.push(emp); }
+    if(l.qualificacao==='Qualificado+'){ m.qualp++; m.listQualp.push(emp); }
+    else if(l.qualificacao==='Qualificado'){ m.qual++; m.listQual.push(emp); }
     else if(l.qualificacao==='Desqualificado') m.desq++;
     else m.naoprov++;
     if(l.status==='Vendido'){
       m.vendidos++; c.vendidos++;
+      m.listVendidos.push(emp);
       m.totalMrr+=l.mrrServ; m.totalMrrBi+=l.mrrBi;
       m.totalEvento+=l.evento; m.totalImpl+=l.impl; m.totalProd+=l.produto; m.totalProj+=(l.projetoPersonalizado||0);
       c.mrr+=l.mrrServ; c.mrrbi+=l.mrrBi; c.impl+=l.impl;
@@ -1722,46 +1748,84 @@ function recalc(){
 
   // Resumo funil
   setMG('resumo-funil',[
-    mc('Total leads',m.total,'',''),
-    mc('Iniciais realizadas',m.inicialReal,'',''),
-    mc('Propostas realizadas',m.propostaReal,'','orange'),
-    mc('Vendidos',m.vendidos,m.vendasUnicas < m.vendidos ? m.vendasUnicas+' unicas por CNPJ' : '','green'),
-    mc('No-shows',m.noshow,'','amber'),
-    mc('MRR Total',fmt(m.totalMrr+m.totalMrrBi),'recorrencia','green'),
-    mc('Total combinado',fmt(m.totalCombinado),'','orange'),
-    mc('Empresas vendidas',(m.qtdEmpresasVendidas||0),'unicas (por CNPJ)','blue'),
-    mc('Contratos assinados',m.contratosAssin,'','blue')
+    mc('Total leads',m.total,'','',leads.map(function(l){return l.empresa||'(sem nome)';})),
+    mc('Iniciais realizadas',m.inicialReal,'','',m.listInicialReal),
+    mc('Propostas realizadas',m.propostaReal,'','orange',m.listPropostaReal),
+    mc('Vendidos',m.vendidos,m.vendasUnicas < m.vendidos ? m.vendasUnicas+' unicas por CNPJ' : '','green',m.listVendidos),
+    mc('No-shows',m.noshow,'','amber',m.listNoshow),
+    mc('MRR Total',fmt(m.totalMrr+m.totalMrrBi),'recorrencia','green',m.listVendidos),
+    mc('Total combinado',fmt(m.totalCombinado),'','orange',m.listVendidos),
+    mc('Empresas vendidas',(m.qtdEmpresasVendidas||0),'unicas (por CNPJ)','blue',m.listVendidos),
+    mc('Contratos assinados',m.contratosAssin,'','blue',m.listContratos)
   ]);
 
   // Metricas volume
   setMG('metricas-volume',[
-    mc('Total leads',m.total,'no mes',''),
-    mc('Qualif+',m.qualp,'decisor + 2k assin','green'),
-    mc('Qualificados',m.qual,'acima de 2k','blue'),
-    mc('Desqualificados',m.desq,'abaixo de 2k','amber'),
-    mc('Iniciais realizadas',m.inicialReal,'',''),
-    mc('Propostas realizadas',m.propostaReal,'',''),
-    mc('Follow-ups',m.followReal,'realizados',''),
-    mc('No-shows',m.noshow,'','amber'),
-    mc('Vendidos',m.vendidos,m.vendasUnicas < m.vendidos ? m.vendasUnicas+' unicas por CNPJ' : '','orange'),
-    mc('Conversao',fmtPct(m.convGeral),m.vendasUnicas+' vendas unicas / '+m.leadsQual+' qualif.','green'),
-    mc('Ticket MRR Serv',fmt(m.ticketMrr),(m.qtdMrrServ||0)+' servicos MRR','green'),
-    mc('Ticket MRR BI',fmt(m.ticketMrrBi),(m.qtdMrrBi||0)+' servicos BI','blue'),
-    mc('Pagos',m.pagos,'',''),
-    mc('Contratos assinados',m.contratosAssin,'','')
+    mc('Total leads',m.total,'no mes','',leads.map(function(l){return l.empresa||'(sem nome)';})),
+    mc('Qualif+',m.qualp,'decisor + 2k assin','green',m.listQualp),
+    mc('Qualificados',m.qual,'acima de 2k','blue',m.listQual),
+    mc('Desqualificados',m.desq,'abaixo de 2k','amber',[]),
+    mc('Iniciais realizadas',m.inicialReal,'','',m.listInicialReal),
+    mc('Propostas realizadas',m.propostaReal,'','',m.listPropostaReal),
+    mc('Follow-ups',m.followReal,'realizados','',m.listFollowReal),
+    mc('No-shows',m.noshow,'','amber',m.listNoshow),
+    mc('Vendidos',m.vendidos,m.vendasUnicas < m.vendidos ? m.vendasUnicas+' unicas por CNPJ' : '','orange',m.listVendidos),
+    mc('Conversao',fmtPct(m.convGeral),m.vendasUnicas+' vendas unicas / '+m.leadsQual+' qualif.','green',m.listVendidos),
+    mc('Ticket MRR Serv',fmt(m.ticketMrr),(m.qtdMrrServ||0)+' servicos MRR','green',leads.filter(function(l){return l.status==='Vendido'&&l.mrrServ>0;}).map(function(l){return l.empresa+' — R$'+l.mrrServ+'/mês';})),
+    mc('Ticket MRR BI',fmt(m.ticketMrrBi),(m.qtdMrrBi||0)+' servicos BI','blue',leads.filter(function(l){return l.status==='Vendido'&&l.mrrBi>0;}).map(function(l){return l.empresa+' — R$'+l.mrrBi+'/mês';})),
+    mc('Pagos',m.pagos,'','',m.listPagos),
+    mc('Contratos assinados',m.contratosAssin,'','',m.listContratos)
   ]);
 
-  // Canal table
+  // Canal table — com qualificados por canal
   var ct=document.getElementById('canal-table');
   if(ct){
-    var h='<tr><th>Canal</th><th>Leads</th><th>Vendidos</th><th>Conversao</th></tr>';
+    // Calcular qualificados e qualificados+ por canal
+    var canalQual = {};
+    leads.forEach(function(l){
+      var c = l.canal || '—';
+      if(!canalQual[c]) canalQual[c]={qual:0,qualp:0};
+      if(l.qualificacao==='Qualificado') canalQual[c].qual++;
+      if(l.qualificacao==='Qualificado+') canalQual[c].qualp++;
+    });
+    var tQ=0,tQp=0;
+    var thStyle='padding:6px 10px;text-align:left;color:rgba(255,255,255,.4);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-bottom:.5px solid rgba(255,255,255,.1)';
+    var h='<tr>'
+      +'<th style="'+thStyle+'">Canal</th>'
+      +'<th style="'+thStyle+';text-align:center">Leads</th>'
+      +'<th style="'+thStyle+';text-align:center">Qualif.</th>'
+      +'<th style="'+thStyle+';text-align:center">Qualif.+</th>'
+      +'<th style="'+thStyle+';text-align:center">Vendidos</th>'
+      +'<th style="'+thStyle+';text-align:center">Conversao</th>'
+      +'</tr>';
     var tL=0,tV=0;
+    var tdS='padding:8px 10px;border-bottom:.5px solid rgba(255,255,255,.05)';
     var rows=CANAIS.map(function(c){
       var d=m.canais[c]||{leads:0,vendidos:0};
-      tL+=d.leads;tV+=d.vendidos;
-      return '<tr><td>'+c+'</td><td>'+d.leads+'</td><td class="ora">'+d.vendidos+'</td><td>'+(d.leads>0?(d.vendidos/d.leads*100).toFixed(0)+'%':'--')+'</td></tr>';
+      var q=canalQual[c]||{qual:0,qualp:0};
+      tL+=d.leads; tV+=d.vendidos; tQ+=q.qual; tQp+=q.qualp;
+      var conv = d.leads>0?(d.vendidos/d.leads*100).toFixed(0)+'%':'--';
+      return '<tr>'
+        +'<td style="'+tdS+';font-weight:500">'+c+'</td>'
+        +'<td style="'+tdS+';text-align:center">'+d.leads+'</td>'
+        +'<td style="'+tdS+';text-align:center;color:#4fc3f7">'+q.qual+'</td>'
+        +'<td style="'+tdS+';text-align:center;color:#1baf7a">'+q.qualp+'</td>'
+        +'<td style="'+tdS+';text-align:center;color:#ff9940;font-weight:600">'+d.vendidos+'</td>'
+        +'<td style="'+tdS+';text-align:center">'+conv+'</td>'
+      +'</tr>';
     }).join('');
-    ct.innerHTML=h+rows+'<tr style="border-top:.5px solid rgba(255,255,255,.2);font-weight:600"><td>TOTAL</td><td>'+tL+'</td><td class="ora">'+m.vendasUnicas+' <span style="font-size:10px;color:rgba(255,255,255,.4)">('+tV+' leads)</span></td><td>'+(m.leadsQual>0?(m.vendasUnicas/m.leadsQual*100).toFixed(0):'0')+'% <span style="font-size:10px;color:rgba(255,255,255,.35)">qualif.</span></td></tr>';
+    var totStyle='padding:8px 10px;font-weight:700;border-top:.5px solid rgba(255,255,255,.15)';
+    ct.innerHTML=h+rows
+      +'<tr>'
+      +'<td style="'+totStyle+';color:#ff6b00">TOTAL</td>'
+      +'<td style="'+totStyle+';text-align:center;color:#ff6b00">'+tL+'</td>'
+      +'<td style="'+totStyle+';text-align:center;color:#4fc3f7">'+tQ+'</td>'
+      +'<td style="'+totStyle+';text-align:center;color:#1baf7a">'+tQp+'</td>'
+      +'<td style="'+totStyle+';text-align:center;color:#ff6b00">'+m.vendasUnicas
+        +'<span style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-left:4px">('+tV+' leads)</span></td>'
+      +'<td style="'+totStyle+';text-align:center;color:#ff6b00">'+(m.leadsQual>0?(m.vendasUnicas/m.leadsQual*100).toFixed(0):'0')+'%'
+        +'<span style="font-size:10px;font-weight:400;color:rgba(255,255,255,.35);margin-left:3px">qualif.</span></td>'
+      +'</tr>';
   }
 
   // Receita canal
@@ -2037,10 +2101,23 @@ function recalc(){
   }
 }
 
-function mc(lbl,val,sub,tipo){
+function mc(lbl,val,sub,tipo,tooltip){
   var cls={'orange':'orange','green':'green','blue':'blue','amber':'amber'}[tipo]||'';
   var vc={'orange':'ora','green':'grn','blue':'blu','amber':'amb'}[tipo]||'';
-  return '<div class="metric-card '+cls+'"><div class="metric-lbl">'+lbl+'</div><div class="metric-val '+vc+'">'+val+'</div>'+(sub?'<div class="metric-sub">'+sub+'</div>':'')+'</div>';
+  var ttHtml='';
+  if(tooltip && tooltip.length>0){
+    ttHtml='<div class="mc-tooltip"><div class="mc-tooltip-title">'+lbl+' ('+tooltip.length+')</div>'
+      +tooltip.map(function(t){return '<div class="mc-tooltip-item">'+t+'</div>';}).join('')
+      +'</div>';
+  } else if(tooltip && tooltip.length===0){
+    ttHtml='<div class="mc-tooltip"><div class="mc-tooltip-title">'+lbl+'</div><div class="mc-tooltip-empty">Nenhum item</div></div>';
+  }
+  return '<div class="metric-card '+cls+'" style="position:relative">'
+    +'<div class="metric-lbl">'+lbl+'</div>'
+    +'<div class="metric-val '+vc+'">'+val+'</div>'
+    +(sub?'<div class="metric-sub">'+sub+'</div>':'')
+    +ttHtml
+    +'</div>';
 }
 function setMG(id,items){ var e=document.getElementById(id); if(e) e.innerHTML=items.join(''); }
 function metaRow(nome,val,min,ideal){
