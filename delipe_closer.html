@@ -1666,7 +1666,22 @@ function getMetrics(){
     }
   });
   m.totalCombinado=m.totalMrr+m.totalMrrBi+m.totalEvento+m.totalImpl+m.totalProd+m.totalProj;
-  m.convGeral=m.total>0?m.vendidos/m.total:0;
+  // Conversao: vendas unicas por CNPJ / leads qualificados (Qualificado + Qualificado+)
+  var leadsQual = leads.filter(function(l){
+    return l.qualificacao==='Qualificado' || l.qualificacao==='Qualificado+';
+  }).length;
+  // Vendas unicas: deduplicar por CNPJ (mesmo CNPJ = 1 venda)
+  var cnpjsVendidos = {};
+  leads.forEach(function(l){
+    if(l.status==='Vendido'){
+      var key = (l.cnpj && l.cnpj.trim()) ? l.cnpj.trim() : 'sem-cnpj-'+l.id;
+      cnpjsVendidos[key] = true;
+    }
+  });
+  var vendasUnicas = Object.keys(cnpjsVendidos).length;
+  m.vendasUnicas = vendasUnicas;
+  m.leadsQual    = leadsQual;
+  m.convGeral    = leadsQual > 0 ? vendasUnicas / leadsQual : 0;
 
   // Ticket medio separado por tipo de servico
   // MRR Servico: leads vendidos com servico != 'BI' e mrrServ > 0
@@ -1710,7 +1725,7 @@ function recalc(){
     mc('Total leads',m.total,'',''),
     mc('Iniciais realizadas',m.inicialReal,'',''),
     mc('Propostas realizadas',m.propostaReal,'','orange'),
-    mc('Vendidos',m.vendidos,'','green'),
+    mc('Vendidos',m.vendidos,m.vendasUnicas < m.vendidos ? m.vendasUnicas+' unicas por CNPJ' : '','green'),
     mc('No-shows',m.noshow,'','amber'),
     mc('MRR Total',fmt(m.totalMrr+m.totalMrrBi),'recorrencia','green'),
     mc('Total combinado',fmt(m.totalCombinado),'','orange'),
@@ -1728,8 +1743,8 @@ function recalc(){
     mc('Propostas realizadas',m.propostaReal,'',''),
     mc('Follow-ups',m.followReal,'realizados',''),
     mc('No-shows',m.noshow,'','amber'),
-    mc('Vendidos',m.vendidos,'','orange'),
-    mc('Conversao',fmtPct(m.convGeral),'leads > venda','green'),
+    mc('Vendidos',m.vendidos,m.vendasUnicas < m.vendidos ? m.vendasUnicas+' unicas por CNPJ' : '','orange'),
+    mc('Conversao',fmtPct(m.convGeral),m.vendasUnicas+' vendas unicas / '+m.leadsQual+' qualif.','green'),
     mc('Ticket MRR Serv',fmt(m.ticketMrr),(m.qtdMrrServ||0)+' servicos MRR','green'),
     mc('Ticket MRR BI',fmt(m.ticketMrrBi),(m.qtdMrrBi||0)+' servicos BI','blue'),
     mc('Pagos',m.pagos,'',''),
@@ -1746,7 +1761,7 @@ function recalc(){
       tL+=d.leads;tV+=d.vendidos;
       return '<tr><td>'+c+'</td><td>'+d.leads+'</td><td class="ora">'+d.vendidos+'</td><td>'+(d.leads>0?(d.vendidos/d.leads*100).toFixed(0)+'%':'--')+'</td></tr>';
     }).join('');
-    ct.innerHTML=h+rows+'<tr><td>TOTAL</td><td>'+tL+'</td><td class="ora">'+tV+'</td><td>'+(tL>0?(tV/tL*100).toFixed(0):'0')+'%</td></tr>';
+    ct.innerHTML=h+rows+'<tr style="border-top:.5px solid rgba(255,255,255,.2);font-weight:600"><td>TOTAL</td><td>'+tL+'</td><td class="ora">'+m.vendasUnicas+' <span style="font-size:10px;color:rgba(255,255,255,.4)">('+tV+' leads)</span></td><td>'+(m.leadsQual>0?(m.vendasUnicas/m.leadsQual*100).toFixed(0):'0')+'% <span style="font-size:10px;color:rgba(255,255,255,.35)">qualif.</span></td></tr>';
   }
 
   // Receita canal
