@@ -666,7 +666,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   <div id="home-loading" style="text-align:center;padding:2rem;font-size:13px;color:rgba(255,255,255,.35)">Carregando...</div>
 
   <div id="home-content" style="display:none">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px" id="home-cards-meta"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px" id="home-cards-meta"></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px" id="home-cards-extra"></div>
     <div id="home-campanha-wrap" style="margin-top:14px"></div>
   </div>
@@ -3731,31 +3731,52 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
   var pctVend = _homePct(totalComb, meta);
   var pctPago = _homePct(totalPago, meta);
   var faltaMeta = Math.max(0, meta - totalComb);
+  var acimaPct = pctVend >= 100 ? Math.round((totalComb - meta) / meta * 100) : 0;
   var cards = document.getElementById('home-cards-meta');
   var extra = document.getElementById('home-cards-extra');
+  var corVend = pctVend >= 100 ? '#1baf7a' : pctVend >= 70 ? '#ff9940' : '#ff6b00';
+  var corPct  = pctVend >= 100 ? '#1baf7a' : pctVend >= 70 ? '#ff9940' : '#e34948';
+  var bgPct   = pctVend >= 100 ? '27,175,122' : '255,107,0';
 
   cards.innerHTML =
-    '<div class="home-meta-card">'
-    +'<div class="hmc-label">Meta '+labelPeriodo+'</div>'
-    +'<div class="hmc-meta">Referência: '+_homeF(meta)+'</div>'
-    +'<div class="hmc-title">'+_homeF(totalComb)+'</div>'
-    +'<div class="hmc-sub">Total combinado vendido</div>'
-    +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-vendido" style="width:'+pctVend+'%;background:'+_barColor(pctVend)+'"></div></div>'
-    +(function(){
-      if(pctVend >= 100){
-        var acimaPct = Math.round((totalComb - meta) / meta * 100);
-        return '<div class="hmc-pct-row"><span style="color:#1baf7a;font-weight:700">✓ Meta batida! '+pctVend+'% entregue</span><span style="background:rgba(27,175,122,.15);color:#1baf7a;font-weight:700;padding:2px 8px;border-radius:20px;font-size:12px">+'+acimaPct+'% acima da meta</span></div>';
-      }
-      return '<div class="hmc-pct-row"><span style="color:#ff9940;font-weight:700">'+pctVend+'% da meta vendido</span><span style="color:rgba(255,255,255,.3)">Faltam '+_homeF(faltaMeta)+'</span></div>';
-    })()
-    +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-pago" style="width:'+pctPago+'%"></div></div>'
-    +'<div class="hmc-pct-row"><span style="color:#1baf7a;font-weight:700">'+pctPago+'% pago</span><span style="color:rgba(255,255,255,.3)">'+_homeF(totalPago)+' recebido</span></div>'
+    '<div style="background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:16px;padding:1.6rem 1.8rem">'
+    +'<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.1em">Meta '+labelPeriodo+'</div>'
+    +'<div style="font-size:36px;font-weight:800;color:#fff;line-height:1;margin:6px 0">'+_homeF(meta)+'</div>'
+    +'<div style="font-size:12px;color:rgba(255,255,255,.35)">Referência do período</div>'
+    +'<div style="margin-top:12px;background:rgba(255,255,255,.06);border-radius:8px;height:6px;overflow:hidden">'
+      +'<div style="height:6px;border-radius:8px;width:'+Math.min(pctVend,100)+'%;background:'+corVend+'"></div>'
+    +'</div>'
+    +'</div>'
+
+    +'<div style="background:rgba(255,107,0,.06);border:.5px solid rgba(255,107,0,.2);border-radius:16px;padding:1.6rem 1.8rem">'
+    +'<div style="font-size:11px;font-weight:700;color:#ff9940;text-transform:uppercase;letter-spacing:.1em">Total entregue</div>'
+    +'<div style="font-size:36px;font-weight:800;color:'+corVend+';line-height:1;margin:6px 0">'+_homeF(totalComb)+'</div>'
+    +'<div style="font-size:12px;color:rgba(255,255,255,.35)">Total combinado vendido</div>'
+    +(pctVend>=100
+      ?'<div style="margin-top:8px;display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:700;color:#1baf7a">✓ Meta batida!</span><span style="background:rgba(27,175,122,.2);color:#1baf7a;font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px">+'+acimaPct+'% acima</span></div>'
+      :'<div style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.35)">Faltam '+_homeF(faltaMeta)+'</div>'
+    )
+    +'</div>'
+
+    +'<div style="background:rgba('+bgPct+',.06);border:.5px solid rgba('+bgPct+',.25);border-radius:16px;padding:1.6rem 1.8rem;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center">'
+    +'<div style="font-size:11px;font-weight:700;color:'+corPct+';text-transform:uppercase;letter-spacing:.1em">Realizado</div>'
+    +'<div style="font-size:64px;font-weight:900;color:'+corPct+';line-height:1;margin:8px 0">'+pctVend+'<span style="font-size:28px;font-weight:700">%</span></div>'
+    +'<div style="font-size:12px;color:rgba(255,255,255,.35)">da meta</div>'
+    +(pctVend>=100?'<div style="font-size:26px;margin-top:6px">🏆</div>':'<div style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.4)">'+_homeF(faltaMeta)+' para bater</div>')
     +'</div>';
 
   extra.innerHTML =
-    '<div class="hmc-extra-card"><div class="hec-lbl">Vendido</div><div class="hec-val" style="color:#ff9940">'+_homeF(totalComb)+'</div><div class="hec-sub">Total combinado</div></div>'
-    +'<div class="hmc-extra-card"><div class="hec-lbl">Pago / Ag. pagamento</div><div class="hec-val" style="color:#1baf7a">'+_homeF(totalPago)+'</div><div class="hec-sub">'+_homePct(totalPago,totalComb)+'% do vendido recebido</div></div>'
-    +'<div class="hmc-extra-card"><div class="hec-lbl">Falta para meta</div><div class="hec-val" style="color:'+(faltaMeta===0?'#1baf7a':'#e34948')+'">'+_homeF(faltaMeta)+'</div><div class="hec-sub">'+(faltaMeta===0?'Meta atingida!':pctVend+'% concluido')+'</div></div>';
+    '<div class="hmc-extra-card">'
+    +'<div class="hec-lbl">Pago (confirmado)</div>'
+    +'<div class="hec-val" style="color:#1baf7a">'+_homeF(totalPago)+'</div>'
+    +'<div class="hec-sub">'+pctPago+'% do entregue recebido</div>'
+    +'<div style="margin-top:8px;background:rgba(255,255,255,.06);border-radius:6px;height:5px;overflow:hidden"><div style="height:5px;border-radius:6px;width:'+pctPago+'%;background:#1baf7a"></div></div>'
+    +'</div>'
+    +'<div class="hmc-extra-card">'
+    +'<div class="hec-lbl">Falta para meta</div>'
+    +'<div class="hec-val" style="color:'+(faltaMeta===0?'#1baf7a':'#e34948')+'">'+_homeF(faltaMeta)+'</div>'
+    +'<div class="hec-sub">'+(faltaMeta===0?'🎉 Meta atingida!':pctVend+'% concluído')+'</div>'
+    +'</div>';
 
   document.getElementById('home-loading').style.display='none';
   document.getElementById('home-content').style.display='block';
