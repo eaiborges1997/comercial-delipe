@@ -359,6 +359,11 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 .home-mes-btn:hover{background:rgba(255,107,0,.15);color:rgba(255,107,0,.8);border-color:rgba(255,107,0,.3)}
 .home-mes-btn.active{background:rgba(255,107,0,.2);color:#ff9940;border-color:rgba(255,107,0,.5)}
 .home-mes-btn.current{border-color:rgba(255,255,255,.3)}
+.home-avatar-wrap{position:relative;width:80px;height:80px;margin:0 auto 1rem;cursor:pointer}
+.home-avatar{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2.5px solid #ff6b00;background:rgba(255,107,0,.15);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#ff6b00;overflow:hidden}
+.home-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.home-avatar-edit{position:absolute;bottom:2px;right:2px;width:22px;height:22px;border-radius:50%;background:#ff6b00;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;border:2px solid #0d0720}
+.home-avatar-edit:hover{background:#ff9940}
 .home-meta-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:16px;padding:1.4rem 1.6rem;position:relative;overflow:hidden}
 .home-meta-card .hmc-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
 .home-meta-card .hmc-meta{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:14px}
@@ -614,10 +619,13 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 <!-- ===== FUNIL ===== -->
 <div id="tab-home" class="tab-content active">
   <div class="card" id="home-boas-vindas" style="text-align:center;padding:2rem 1.5rem 1.5rem">
+    <div class="home-avatar-wrap" onclick="document.getElementById('home-avatar-input').click()" title="Clique para trocar foto">
+      <div class="home-avatar" id="home-avatar-circle"><span id="home-avatar-inicial">?</span></div>
+      <div class="home-avatar-edit">✏️</div>
+    </div>
+    <input type="file" id="home-avatar-input" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
     <div style="font-size:28px;font-weight:700;color:#fff;margin-bottom:4px">Bem-vindo, <span id="home-nome" style="color:#ff6b00">—</span></div>
-    <div style="font-size:13px;color:rgba(255,255,255,.35);margin-bottom:1.4rem" id="home-subtitulo">Comercial Delipe</div>
-    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
-      <div id="home-toggle-mes" onclick="homeSetView('mes')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#ff6b00;color:#fff">Meses</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.35);margin-bottom:1.4rem" idMeses</div>
       <div id="home-toggle-tri" onclick="homeSetView('tri')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.08);color:rgba(255,255,255,.5)">Trimestre</div>
     </div>
     <div id="home-meses-picker" style="display:none;margin-top:12px">
@@ -2945,6 +2953,7 @@ function mostrarApp(user){
     setTimeout(carregarDadosIniciais, 500);
     setTimeout(function(){ carregarHome(); }, 800);
     setTimeout(function(){ carregarConfig(); }, 1000);
+    setTimeout(function(){ carregarAvatar(); }, 1200);
   } else if(isSdr){
     document.getElementById('admin-bar').classList.remove('visible');
     document.getElementById('admin-only-config').classList.remove('visible');
@@ -2972,6 +2981,7 @@ function mostrarApp(user){
     setTimeout(carregarDadosIniciais, 500);
     setTimeout(function(){ carregarHome(); }, 800);
     setTimeout(function(){ carregarConfig(); }, 1000);
+    setTimeout(function(){ carregarAvatar(); }, 1200);
   }
 }
 
@@ -3736,7 +3746,13 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     +'<div class="hmc-title">'+_homeF(totalComb)+'</div>'
     +'<div class="hmc-sub">Total combinado vendido</div>'
     +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-vendido" style="width:'+pctVend+'%;background:'+_barColor(pctVend)+'"></div></div>'
-    +'<div class="hmc-pct-row"><span style="color:#ff9940;font-weight:700">'+pctVend+'% da meta vendido</span><span style="color:rgba(255,255,255,.3)">Faltam '+_homeF(faltaMeta)+'</span></div>'
+    +(function(){
+      if(pctVend >= 100){
+        var acimaPct = Math.round((totalComb - meta) / meta * 100);
+        return '<div class="hmc-pct-row"><span style="color:#1baf7a;font-weight:700">✓ Meta batida! '+pctVend+'% entregue</span><span style="background:rgba(27,175,122,.15);color:#1baf7a;font-weight:700;padding:2px 8px;border-radius:20px;font-size:12px">+'+acimaPct+'% acima da meta</span></div>';
+      }
+      return '<div class="hmc-pct-row"><span style="color:#ff9940;font-weight:700">'+pctVend+'% da meta vendido</span><span style="color:rgba(255,255,255,.3)">Faltam '+_homeF(faltaMeta)+'</span></div>';
+    })()
     +'<div class="hmc-bar-wrap"><div class="hmc-bar hmc-bar-pago" style="width:'+pctPago+'%"></div></div>'
     +'<div class="hmc-pct-row"><span style="color:#1baf7a;font-weight:700">'+pctPago+'% pago</span><span style="color:rgba(255,255,255,.3)">'+_homeF(totalPago)+' recebido</span></div>'
     +'</div>';
@@ -3766,9 +3782,12 @@ async function carregarHome(){
   // Inicializar meses selecionados se vazio
   if(_homeSelectedMeses.length === 0) _initHomeSelectedMeses();
 
-  // Nome
+  // Nome e avatar
   var nome = currentUser.displayName || currentUser.nome || currentUser.email.split('@')[0];
   document.getElementById('home-nome').textContent = nome.split(' ')[0];
+  var inicial = document.getElementById('home-avatar-inicial');
+  if(inicial) inicial.textContent = nome.charAt(0).toUpperCase();
+  carregarAvatar();
 
   // Buscar metas do usuario
   var fb = window._fb;
@@ -4750,6 +4769,54 @@ async function moverLeadParaMes(lead, mesDestino, anoDestino, mesOrigem, anoOrig
     console.error('Erro ao mover lead:', e);
     setSyncStatus('error','Erro ao mover lead: '+e.message);
   }
+}
+
+
+// ==================== AVATAR DO USUARIO ====================
+function uploadAvatar(input){
+  var file = input.files[0];
+  if(!file) return;
+  if(file.size > 500000){
+    alert('Imagem muito grande. Use uma imagem menor que 500KB.');
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var base64 = e.target.result;
+    // Salvar no Firestore
+    if(window._fb && currentUser){
+      var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+      window._fb.setDoc(window._fb.doc(window._fb.db,'usuarios',emailKey),{avatar:base64},{merge:true});
+    }
+    // Atualizar UI
+    _aplicarAvatar(base64);
+  };
+  reader.readAsDataURL(file);
+}
+
+function _aplicarAvatar(base64){
+  var circle = document.getElementById('home-avatar-circle');
+  if(!circle) return;
+  circle.innerHTML = '<img src="'+base64+'" alt="Avatar" style="width:80px;height:80px;border-radius:50%;object-fit:cover">';
+  // Atualizar também o avatar na barra do usuário se existir
+  var barAvatar = document.getElementById('user-bar-avatar');
+  if(barAvatar) barAvatar.src = base64;
+}
+
+async function carregarAvatar(){
+  if(!window._fb || !currentUser) return;
+  try {
+    var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+    var snap = await window._fb.getDoc(window._fb.doc(window._fb.db,'usuarios',emailKey));
+    if(snap.exists() && snap.data().avatar){
+      _aplicarAvatar(snap.data().avatar);
+    } else {
+      // Mostrar inicial do nome
+      var inicial = document.getElementById('home-avatar-inicial');
+      var nome = currentUser.displayName || currentUser.email.split('@')[0];
+      if(inicial) inicial.textContent = nome.charAt(0).toUpperCase();
+    }
+  } catch(e){ console.warn('carregarAvatar err:', e); }
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
