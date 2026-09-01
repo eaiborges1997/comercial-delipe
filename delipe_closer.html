@@ -3765,139 +3765,123 @@ function _homeF(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionD
 
 async function carregarHome(){
   if(!currentUser || !window._fb) return;
-  document.getElementById('home-loading').style.display='block';
-  document.getElementById('home-content').style.display='none';
-  document.getElementById('home-time-grid').style.display='none';
+  var loadEl = document.getElementById('home-loading');
+  var contEl = document.getElementById('home-content');
+  var timeEl = document.getElementById('home-time-grid');
+  if(loadEl) loadEl.style.display='block';
+  if(contEl) contEl.style.display='none';
+  if(timeEl) timeEl.style.display='none';
 
-  // Mostrar barra admin
-  if(isAdmin){
+  if(isAdmin && document.getElementById('home-admin-bar'))
     document.getElementById('home-admin-bar').style.display='block';
-  }
 
-  // Inicializar meses selecionados se vazio
+  // Inicializar meses
   if(_homeSelectedMeses.length === 0) _initHomeSelectedMeses();
-  // Garantir que picker esteja visivel quando view=mes
   if(_homeView === 'mes'){
     var pk = document.getElementById('home-meses-picker');
-    if(pk && pk.style.display === 'none') pk.style.display = 'block';
+    if(pk) pk.style.display = 'block';
   }
 
   // Nome
-  var nome = currentUser.displayName || currentUser.nome || currentUser.email.split('@')[0];
-  document.getElementById('home-nome').textContent = nome.split(' ')[0];
-  var inicial = document.getElementById('home-avatar-inicial');
-  if(inicial) inicial.textContent = nome.charAt(0).toUpperCase();
-  // Avatar carregado separadamente para nao bloquear a home
+  var nome = (currentUser.displayName || currentUser.nome || currentUser.email.split('@')[0]);
+  var nomeEl = document.getElementById('home-nome');
+  if(nomeEl) nomeEl.textContent = nome.split(' ')[0];
+  var inicialEl = document.getElementById('home-avatar-inicial');
+  if(inicialEl) inicialEl.textContent = nome.charAt(0).toUpperCase();
 
-  // Buscar metas do usuario
   var fb = window._fb;
-  // Se admin vendo outro closer, usar email do closer selecionado
-  var emailParaHome = (isAdmin && window._viewingEmail && _homeUserView !== 'eu') 
-    ? window._viewingEmail 
-    : currentUser.email;
-  var emailKey = emailParaHome.replace(/[^a-zA-Z0-9]/g,'_');
-  // Metas sempre do usuario atual (nao do closer visualizado)
-  var emailKeyMeta = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
   var metaMensal = 100000, metaTrimestral = 300000;
+
+  // Buscar metas (nao bloquear se falhar)
   try {
-    var snapMeta = await fb.getDoc(fb.doc(fb.db,'usuarios',emailKeyMeta));
+    var snapMeta = await fb.getDoc(fb.doc(fb.db,'usuarios',emailKey));
     if(snapMeta.exists()){
       var d = snapMeta.data();
       metaMensal     = d.metaMensal     || 100000;
       metaTrimestral = d.metaTrimestral || 300000;
-      // Pre-preencher inputs de config
       var inpM = document.getElementById('meta-mensal-input');
       var inpT = document.getElementById('meta-trimestral-input');
       if(inpM && !inpM.value) inpM.value = metaMensal;
       if(inpT && !inpT.value) inpT.value = metaTrimestral;
     }
-  } catch(e){ console.warn('meta load err', e); }
+  } catch(e){ console.warn('home meta err:', e); }
 
   var ma = getMesAno();
+  var totalComb = 0, totalPago = 0, leadsMulti = [];
 
-  if(_homeView === 'mes'){
-    // Suporte a multiplos meses selecionados
-    var mesesSel = _homeSelectedMeses.length > 0 ? _homeSelectedMeses : [ma.mes];
-    var labelMeses = mesesSel.length === 1 ? mesesSel[0]+' de '+ma.ano : mesesSel.join(', ')+' / '+ma.ano;
-    document.getElementById('home-subtitulo').textContent = labelMeses;
+  try {
+    if(_homeView === 'mes'){
+      var mesesSel = _homeSelectedMeses.length > 0 ? _homeSelectedMeses : [ma.mes];
+      var labelMeses = mesesSel.length === 1
+        ? mesesSel[0]+' de '+ma.ano
+        : mesesSel.join(', ')+' / '+ma.ano;
+      var subEl = document.getElementById('home-subtitulo');
+      if(subEl) subEl.textContent = labelMeses;
 
-    var totalComb = 0, totalPago = 0;
-    var leadsMulti = [];
+      for(var mi=0; mi<mesesSel.length; mi++){
+        try {
+          var chaveM = emailKey+'__'+mesesSel[mi]+'_'+ma.ano;
+          var snapM = await fb.getDoc(fb.doc(fb.db,'leads',chaveM));
+          if(snapM.exists() && snapM.data().leads){
+            var leadsM = snapM.data().leads;
+            leadsMulti = leadsMulti.concat(leadsM);
+            leadsM.forEach(function(l){
+              if(l.status==='Vendido'){
+                var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+                totalComb += comb;
+                if(l.pago==='Pago') totalPago += comb;
+              }
+            });
+          }
+        } catch(eM){ console.warn('home mes err:', mesesSel[mi], eM); }
+      }
 
-    // Sempre carregar do Firestore para garantir o mes correto
-    for(var mi=0; mi<mesesSel.length; mi++){
-      var chaveM = emailKey+'__'+mesesSel[mi]+'_'+ma.ano;
-      try {
-        var snapM = await fb.getDoc(fb.doc(fb.db,'leads',chaveM));
-        if(snapM.exists() && snapM.data().leads){
-          var leadsM = snapM.data().leads;
-          leadsMulti = leadsMulti.concat(leadsM);
-          leadsM.forEach(function(l){
-            if(l.status==='Vendido'){
-              var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
-              totalComb += comb;
-              if(l.pago==='Pago') totalPago += comb;
-            }
-          });
-        }
-      } catch(e){ console.warn('load mes err',mesesSel[mi],e); }
+      var metaProporcional = metaMensal * mesesSel.length;
+      var labelMeta = mesesSel.length > 1 ? 'acumulado ('+mesesSel.length+' meses)' : 'mensal';
+      _renderHomeCards(totalComb, totalPago, metaProporcional, labelMeta);
+      calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
+
+    } else {
+      var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+      var mesNum = MESES_PT.indexOf(ma.mes) + 1;
+      var triAtual = mesNum<=3?'Q1':mesNum<=6?'Q2':mesNum<=9?'Q3':'Q4';
+      var triMeses = {Q1:['Janeiro','Fevereiro','Marco'],Q2:['Abril','Maio','Junho'],Q3:['Julho','Agosto','Setembro'],Q4:['Outubro','Novembro','Dezembro']};
+      var mesesTri = triMeses[triAtual];
+      var subEl2 = document.getElementById('home-subtitulo');
+      if(subEl2) subEl2.textContent = triAtual+' / '+ma.ano+' ('+mesesTri[0]+' - '+mesesTri[2]+')';
+
+      for(var i=0; i<mesesTri.length; i++){
+        try {
+          var chave = emailKey+'__'+mesesTri[i]+'_'+ma.ano;
+          var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
+          if(snap.exists() && snap.data().leads){
+            snap.data().leads.forEach(function(l){
+              if(l.status==='Vendido'){
+                var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+                totalComb += comb;
+                if(l.pago==='Pago') totalPago += comb;
+              }
+            });
+          }
+        } catch(eT){ console.warn('home tri err:', mesesTri[i], eT); }
+      }
+
+      _renderHomeCards(totalComb, totalPago, metaTrimestral, 'trimestral');
+      calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
     }
-
-    // Meta: proporcional ao numero de meses selecionados
-    var metaProporcional = metaMensal * mesesSel.length;
-    var labelMeta = mesesSel.length > 1 ? 'acumulado ('+mesesSel.length+' meses)' : 'mensal';
-    _renderHomeCards(totalComb, totalPago, metaProporcional, labelMeta);
-    // Campanha acumulada Q3 — sempre busca os 3 meses independente do seletor
-    calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
-
-  } else {
-    // Trimestre — carregar 3 meses
-    var tri = document.getElementById('tri-select') ? document.getElementById('tri-select').value : 'Q1';
-    var ano = ma.ano;
-    var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    var mesNum = MESES_PT.indexOf(ma.mes) + 1;
-    var triAtual = mesNum<=3?'Q1':mesNum<=6?'Q2':mesNum<=9?'Q3':'Q4';
-    var triMeses = {Q1:['Janeiro','Fevereiro','Marco'],Q2:['Abril','Maio','Junho'],Q3:['Julho','Agosto','Setembro'],Q4:['Outubro','Novembro','Dezembro']};
-    var mesesTri = triMeses[triAtual];
-    document.getElementById('home-subtitulo').textContent = triAtual+' / '+ano+' ('+mesesTri[0]+' - '+mesesTri[2]+')';
-
-    var totalCombTri = 0, totalPagoTri = 0;
-    try {
-      for(var i=0;i<mesesTri.length;i++){
-        var chave = emailKey+'__'+mesesTri[i]+'_'+ano;
-        var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
-        if(snap.exists() && snap.data().leads){
-          snap.data().leads.forEach(function(l){
-            if(l.status==='Vendido'){
-              var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
-              totalCombTri += comb;
-              if(l.pago==='Pago') totalPagoTri += comb;
-            }
-          });
-        }
-      }
-    } catch(e){ console.warn('tri load err', e); }
-    _renderHomeCards(totalCombTri, totalPagoTri, metaTrimestral, 'trimestral');
-    // Calcular campanha trimestral — agregar leads dos 3 meses
-    var leadsTri = [];
-    try {
-      for(var j=0;j<mesesTri.length;j++){
-        var chaveCamp = emailKey+'__'+mesesTri[j]+'_'+ano;
-        var snapCamp = await fb.getDoc(fb.doc(fb.db,'leads',chaveCamp));
-        if(snapCamp.exists() && snapCamp.data().leads){
-          leadsTri = leadsTri.concat(snapCamp.data().leads);
-        }
-      }
-    } catch(e){ console.warn('camp tri err',e); }
-    // Campanha acumulada Q3
-    calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
+  } catch(eGlobal){
+    console.error('carregarHome erro:', eGlobal);
+    // Mesmo com erro, esconder loading e mostrar o que tiver
+    _renderHomeCards(0, 0, metaMensal, 'mensal');
   }
 
   if(isAdmin && _homeUserView==='time'){
-    document.getElementById('home-time-grid').style.display='block';
+    if(timeEl) timeEl.style.display='block';
     carregarHomeTime();
   }
 }
+
 
 async function carregarHomeTime(){
   var fb = window._fb;
