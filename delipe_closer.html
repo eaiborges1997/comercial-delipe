@@ -3725,18 +3725,20 @@ function homeSetUserView(v){
 
 function _homeFmt(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function _homePct(val,meta){ return meta>0?Math.min(100,Math.round(val/meta*100)):0; }
+function _homePctReal(val,meta){ return meta>0?Math.round(val/meta*100):0; }
 function _barColor(pct){ return pct>=100?'#1baf7a':pct>=70?'#ff9940':'#ff6b00'; }
 
 function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
-  var pctVend = _homePct(totalComb, meta);
-  var pctPago = _homePct(totalPago, meta);
+  var pctVend    = _homePctReal(totalComb, meta);  // real sem limite
+  var pctVendBar = _homePct(totalComb, meta);       // para barra (max 100)
+  var pctPago    = _homePctReal(totalPago, meta);
   var faltaMeta = Math.max(0, meta - totalComb);
   var acimaPct = pctVend >= 100 ? Math.round((totalComb - meta) / meta * 100) : 0;
   var cards = document.getElementById('home-cards-meta');
   var extra = document.getElementById('home-cards-extra');
-  var corVend = pctVend >= 100 ? '#1baf7a' : pctVend >= 70 ? '#ff9940' : '#ff6b00';
-  var corPct  = pctVend >= 100 ? '#1baf7a' : pctVend >= 70 ? '#ff9940' : '#e34948';
-  var bgPct   = pctVend >= 100 ? '27,175,122' : '255,107,0';
+  var corVend = pctVendBar >= 100 ? '#1baf7a' : pctVendBar >= 70 ? '#ff9940' : '#ff6b00';
+  var corPct  = pctVendBar >= 100 ? '#1baf7a' : pctVendBar >= 70 ? '#ff9940' : '#e34948';
+  var bgPct   = pctVendBar >= 100 ? '27,175,122' : '255,107,0';
 
   cards.innerHTML =
     '<div style="background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:16px;padding:1.6rem 1.8rem">'
@@ -3744,7 +3746,7 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     +'<div style="font-size:36px;font-weight:800;color:#fff;line-height:1;margin:6px 0">'+_homeF(meta)+'</div>'
     +'<div style="font-size:12px;color:rgba(255,255,255,.35)">Referência do período</div>'
     +'<div style="margin-top:12px;background:rgba(255,255,255,.06);border-radius:8px;height:6px;overflow:hidden">'
-      +'<div style="height:6px;border-radius:8px;width:'+Math.min(pctVend,100)+'%;background:'+corVend+'"></div>'
+      +'<div style="height:6px;border-radius:8px;width:'+pctVendBar+'%;background:'+corVend+'"></div>'
     +'</div>'
     +'</div>'
 
@@ -3752,7 +3754,7 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     +'<div style="font-size:11px;font-weight:700;color:#ff9940;text-transform:uppercase;letter-spacing:.1em">Total entregue</div>'
     +'<div style="font-size:36px;font-weight:800;color:'+corVend+';line-height:1;margin:6px 0">'+_homeF(totalComb)+'</div>'
     +'<div style="font-size:12px;color:rgba(255,255,255,.35)">Total combinado vendido</div>'
-    +(pctVend>=100
+    +(pctVendBar>=100
       ?'<div style="margin-top:8px;display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:700;color:#1baf7a">✓ Meta batida!</span><span style="background:rgba(27,175,122,.2);color:#1baf7a;font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px">+'+acimaPct+'% acima</span></div>'
       :'<div style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.35)">Faltam '+_homeF(faltaMeta)+'</div>'
     )
@@ -3762,7 +3764,7 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     +'<div style="font-size:11px;font-weight:700;color:'+corPct+';text-transform:uppercase;letter-spacing:.1em">Realizado</div>'
     +'<div style="font-size:64px;font-weight:900;color:'+corPct+';line-height:1;margin:8px 0">'+pctVend+'<span style="font-size:28px;font-weight:700">%</span></div>'
     +'<div style="font-size:12px;color:rgba(255,255,255,.35)">da meta</div>'
-    +(pctVend>=100?'<div style="font-size:26px;margin-top:6px">🏆</div>':'<div style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.4)">'+_homeF(faltaMeta)+' para bater</div>')
+    +(pctVendBar>=100?'<div style="font-size:26px;margin-top:6px">🏆</div>':'<div style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.4)">'+_homeF(faltaMeta)+' para bater</div>')
     +'</div>';
 
   extra.innerHTML =
