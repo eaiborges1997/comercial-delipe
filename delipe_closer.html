@@ -1161,7 +1161,7 @@ function newLead(){
     servico:SERVICOS[0],
     mrrServ:0, mrrBi:0, evento:0, impl:0, produto:0, projetoPersonalizado:0,
     contrato:CONTRATO_ST[0], pago:'Ag pagamento', dtPagamento:'',
-    obs:''
+    dtVenda:'', obs:''
   };
 }
 
@@ -1345,6 +1345,21 @@ function buildLeadCard(l,i){
   var pagoBorder= l.pago==='Pago' ? 'rgba(27,175,122,.4)' : l.pago==='Atrasado' ? 'rgba(227,73,72,.4)' : 'rgba(255,255,255,.15)';
   var pagoIcon  = l.pago==='Pago' ? '✓ ' : l.pago==='Atrasado' ? '⚠ ' : '';
   var pagoLabel = l.pago && l.pago!=='Nao se aplica' ? pagoIcon+l.pago : '';
+  // Badge dtVenda — mostra se o lead foi/sera movido para outro mes
+  var MESES_PT_B=['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var dtVendaBadge='';
+  if(l.dtVenda){
+    var pvP=l.dtVenda.split('-');
+    if(pvP.length>=2){
+      var pvMes=MESES_PT_B[parseInt(pvP[1])-1];
+      var pvAno=pvP[0];
+      var maB=getMesAno();
+      if(pvMes!==maB.mes||pvAno!==maB.ano){
+        dtVendaBadge='<span title="Data da venda: '+pvMes+'/'+pvAno+'" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(255,107,0,.12);color:#ff9940;border:.5px solid rgba(255,107,0,.3);margin-left:6px">📅 '+pvMes.substring(0,3)+'/'+pvAno+'</span>';
+      }
+    }
+  }
+
   // Dropdown inline de pagamento (so para Vendido)
   var pagoBadge = l.status==='Vendido'
     ? '<select onchange="alterarPago('+l.id+',this.value)" onclick="event.stopPropagation()" style="font-size:11px;font-weight:700;padding:2px 6px;border-radius:5px;background:'+pagoBg+';color:'+pagoColor+';border:.5px solid '+pagoBorder+';margin-left:6px;cursor:pointer;outline:none;font-family:Inter,sans-serif">'+
@@ -1363,11 +1378,13 @@ function buildLeadCard(l,i){
     if((l.evento||0) > 0) partes.push('Ev: '+fmt(l.evento));
     if((l.impl||0) > 0) partes.push('Impl: '+fmt(l.impl));
     if((l.projetoPersonalizado||0) > 0) partes.push('Proj: '+fmt(l.projetoPersonalizado));
-    mrr.innerHTML = partes.join(' · ') + pagoBadge;
+    mrr.innerHTML = partes.join(' · ') + pagoBadge + dtVendaBadge;
   } else if(totalMrr > 0){
-    mrr.innerHTML = fmt(totalMrr)+'/mes' + pagoBadge;
+    mrr.innerHTML = fmt(totalMrr)+'/mes' + pagoBadge + dtVendaBadge;
   } else if(l.status==='Vendido' && pagoBadge){
-    mrr.innerHTML = pagoBadge;
+    mrr.innerHTML = pagoBadge + dtVendaBadge;
+  } else if(dtVendaBadge){
+    mrr.innerHTML = dtVendaBadge;
   }
 
   var chev=document.createElement('span');
@@ -1451,6 +1468,17 @@ function buildLeadCard(l,i){
   s5.appendChild(fieldSelect('Contrato','contrato',CONTRATO_ST,l));
   s5.appendChild(fieldSelect('Pagamento','pago',['Ag pagamento','Pago','Atrasado','Nao se aplica'],l));
   s5.appendChild(fieldDate('Data do pagamento','dtPagamento',l));
+  var dtVendaWrap = fieldDate('Data da venda','dtVenda',l);
+  // Highlight dtVenda field
+  var dtVendaInput = dtVendaWrap.querySelector('input');
+  if(dtVendaInput){
+    dtVendaInput.style.border = '.5px solid rgba(255,107,0,.4)';
+    dtVendaInput.title = 'Se diferente do mes atual, o lead sera movido para o mes da venda';
+    dtVendaInput.addEventListener('change', function(){ onDtVendaChange(l, this.value); });
+  }
+  var dtVendaLabel = dtVendaWrap.querySelector('label');
+  if(dtVendaLabel){ dtVendaLabel.style.color='#ff9940'; dtVendaLabel.textContent='📅 Data da venda'; }
+  s5.appendChild(dtVendaWrap);
   body.appendChild(s5);
 
   // -- SECAO 6: VALORES --
@@ -4632,6 +4660,96 @@ function cancelarImportXLSX(){
   document.getElementById('xlsx-preview').style.display = 'none';
   document.getElementById('xlsx-import-btn-wrap').style.display = 'none';
   document.getElementById('xlsx-feedback').style.display = 'none';
+}
+
+
+// ==================== MOVER LEAD PARA OUTRO MES ====================
+async function onDtVendaChange(lead, novaData){
+  if(!novaData) return;
+  var partes = novaData.split('-');
+  if(partes.length < 3) return;
+  var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var mesDestino = MESES_PT[parseInt(partes[1])-1];
+  var anoDestino = partes[0];
+  var maAtual = getMesAno();
+
+  // Se a data da venda é no mesmo mes/ano atual, apenas salva o campo normalmente
+  if(mesDestino === maAtual.mes && anoDestino === maAtual.ano){
+    lead.dtVenda = novaData;
+    agendarSalvamento();
+    return;
+  }
+
+  // Confirmar movimentação
+  var confirm = window.confirm(
+    'Mover "'+lead.empresa+'" para '+mesDestino+'/'+anoDestino+'?\n\n'+
+    'O lead sumirá de '+maAtual.mes+'/'+maAtual.ano+' e aparecerá em '+mesDestino+'/'+anoDestino+'.'
+  );
+  if(!confirm){
+    lead.dtVenda = '';
+    // Reset o input visualmente
+    var inputs = document.querySelectorAll('input[type=date]');
+    inputs.forEach(function(inp){ if(inp.value === novaData) inp.value = ''; });
+    return;
+  }
+
+  await moverLeadParaMes(lead, mesDestino, anoDestino, maAtual.mes, maAtual.ano);
+}
+
+async function moverLeadParaMes(lead, mesDestino, anoDestino, mesOrigem, anoOrigem){
+  if(!window._fb || !currentUser) return;
+  var fb = window._fb;
+  var emailSalvar = (isAdmin && window._viewingEmail) ? window._viewingEmail : currentUser.email;
+  var emailKey = emailSalvar.replace(/[^a-zA-Z0-9]/g,'_');
+
+  setSyncStatus('syncing','Movendo lead...');
+  try {
+    // 1. Remover lead do mes atual
+    var idx = leads.findIndex(function(l){ return l.id === lead.id; });
+    if(idx >= 0){
+      // Adicionar histórico no obs antes de mover
+      var histMsg = '\n[Movido de '+mesOrigem+'/'+anoOrigem+' para '+mesDestino+'/'+anoDestino+' em '+new Date().toLocaleDateString('pt-BR')+']';
+      lead.obs = (lead.obs||'') + histMsg;
+      lead.dtVenda = lead.dtVenda || '';
+      leads.splice(idx, 1);
+    }
+
+    // 2. Salvar mes origem sem o lead
+    var chaveOrigem = emailKey+'__'+mesOrigem+'_'+anoOrigem;
+    var maAtual = getMesAno();
+    await fb.setDoc(fb.doc(fb.db,'leads',chaveOrigem),{
+      closer: emailSalvar, mes: mesOrigem, ano: anoOrigem,
+      leads: leads, updatedAt: Date.now()
+    });
+
+    // 3. Carregar mes destino e adicionar o lead
+    var chaveDestino = emailKey+'__'+mesDestino+'_'+anoDestino;
+    var snapDest = await fb.getDoc(fb.doc(fb.db,'leads',chaveDestino));
+    var leadsDestino = [];
+    if(snapDest.exists() && snapDest.data().leads){
+      leadsDestino = snapDest.data().leads;
+    }
+    // Gerar novo ID único no destino
+    var maxId = 0;
+    leadsDestino.forEach(function(l){ if(l.id > maxId) maxId = l.id; });
+    var leadCopia = Object.assign({}, lead, {id: maxId+1});
+    leadsDestino.push(leadCopia);
+
+    await fb.setDoc(fb.doc(fb.db,'leads',chaveDestino),{
+      closer: emailSalvar, mes: mesDestino, ano: anoDestino,
+      leads: leadsDestino, updatedAt: Date.now()
+    });
+
+    // 4. Atualizar UI
+    renderLeads();
+    recalc();
+    setSyncStatus('connected','Lead movido para '+mesDestino+'/'+anoDestino);
+    setTimeout(function(){ setSyncStatus('connected', leads.length+' leads'); }, 3000);
+
+  } catch(e){
+    console.error('Erro ao mover lead:', e);
+    setSyncStatus('error','Erro ao mover lead: '+e.message);
+  }
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
