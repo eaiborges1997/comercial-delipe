@@ -611,7 +611,8 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
   <button class="tab" onclick="showTab('config')">Config</button>
 </div>
 <div class="tabs" id="tabs-sdr" style="display:none">
-  <button class="tab active" onclick="showTabSdr('sdr-funil')">Meus Leads</button>
+  <button class="tab active" onclick="showTabSdr('sdr-home');carregarHomeSdr()">Home</button>
+  <button class="tab" onclick="showTabSdr('sdr-funil')">Meus Leads</button>
   <button class="tab" onclick="showTabSdr('sdr-metricas')">Minhas Metricas</button>
   <button class="tab" onclick="showTabSdr('sdr-bonus')">Bonus</button>
 </div>
@@ -999,6 +1000,29 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
 </div>
 
 <!-- ===== ABAS SDR ===== -->
+<div id="tab-sdr-home" class="tab-content-sdr" style="display:block">
+  <!-- Avatar + boas vindas -->
+  <div class="card" style="text-align:center;padding:2rem 1.5rem 1.5rem">
+    <div class="home-avatar-wrap" onclick="document.getElementById('sdr-avatar-input').click()" title="Clique para trocar foto">
+      <div class="home-avatar" id="sdr-avatar-circle"><span id="sdr-avatar-inicial">?</span></div>
+      <div class="home-avatar-edit">✏️</div>
+    </div>
+    <input type="file" id="sdr-avatar-input" accept="image/*" style="display:none" onchange="uploadAvatarSdr(this)">
+    <div style="font-size:28px;font-weight:700;color:#fff;margin-bottom:4px">Bem-vindo, <span id="sdr-home-nome" style="color:#ff6b00">—</span></div>
+    <div style="font-size:13px;color:rgba(255,255,255,.35);margin-bottom:1.4rem" id="sdr-home-subtitulo">SDR Delipe</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <div id="sdr-toggle-mes" onclick="sdrHomeSetView('mes')" style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#ff6b00;color:#fff">Mês atual</div>
+    </div>
+  </div>
+
+  <!-- 3 cards grandes -->
+  <div id="sdr-home-loading" style="text-align:center;padding:2rem;font-size:13px;color:rgba(255,255,255,.35)">Carregando...</div>
+  <div id="sdr-home-content" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px" id="sdr-home-cards-big"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px" id="sdr-home-cards-small"></div>
+  </div>
+</div>
+
 <div id="tab-sdr-funil" class="tab-content-sdr" style="display:none">
   <div class="card">
     <div class="sec">Meus leads</div>
@@ -2536,10 +2560,11 @@ function esconderAbasCloser(){
   document.querySelectorAll('.tab-content').forEach(function(e){ e.classList.remove('active'); });
 }
 function mostrarAbasSdr(){
-  document.querySelectorAll('.tab-content-sdr').forEach(function(e,i){
-    e.style.display = i===0?'block':'none';
-  });
+  document.querySelectorAll('.tab-content-sdr').forEach(function(e){ e.style.display='none'; });
+  var homeEl = document.getElementById('tab-sdr-home');
+  if(homeEl) homeEl.style.display='block';
   document.querySelectorAll('#tabs-sdr .tab').forEach(function(t,i){ t.classList.toggle('active',i===0); });
+  setTimeout(function(){ carregarHomeSdr(); }, 400);
 }
 function esconderAbasSdr(){
   document.querySelectorAll('.tab-content-sdr').forEach(function(e){ e.style.display='none'; });
@@ -2549,11 +2574,11 @@ function showTabSdr(t){
   document.querySelectorAll('#tabs-sdr .tab').forEach(function(e){ e.classList.remove('active'); });
   var el = document.getElementById('tab-'+t);
   if(el) el.style.display='block';
-  var tabs=['sdr-funil','sdr-metricas','sdr-bonus'];
+  var tabs=['sdr-home','sdr-funil','sdr-metricas','sdr-bonus'];
   var idx = tabs.indexOf(t);
   var btns = document.querySelectorAll('#tabs-sdr .tab');
   if(btns[idx]) btns[idx].classList.add('active');
-  recalcSdr();
+  if(t !== 'sdr-home') recalcSdr();
 }
 
 function getSdrLeads(){
@@ -4827,6 +4852,154 @@ async function carregarAvatar(){
       if(inicial) inicial.textContent = nome.charAt(0).toUpperCase();
     }
   } catch(e){ console.warn('carregarAvatar err:', e); }
+}
+
+
+// ==================== HOME SDR ====================
+var _sdrHomeView = 'mes';
+
+function sdrHomeSetView(v){
+  _sdrHomeView = v;
+  carregarHomeSdr();
+}
+
+async function carregarHomeSdr(){
+  if(!currentUser || !window._fb) return;
+  var loadEl  = document.getElementById('sdr-home-loading');
+  var contEl  = document.getElementById('sdr-home-content');
+  if(loadEl) loadEl.style.display='block';
+  if(contEl) contEl.style.display='none';
+
+  // Nome + avatar
+  var nome = window._sdrNome || currentUser.displayName || currentUser.email.split('@')[0];
+  var nomeEl = document.getElementById('sdr-home-nome');
+  if(nomeEl) nomeEl.textContent = nome.split(' ')[0];
+  var inicialEl = document.getElementById('sdr-avatar-inicial');
+  if(inicialEl) inicialEl.textContent = nome.charAt(0).toUpperCase();
+  carregarAvatarSdr();
+
+  // Metas do SDR (salvas no Firestore)
+  var fb = window._fb;
+  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var metaAgendadas = 25, metaRealizadas = 20, metaQualif = 15;
+  try {
+    var snapMeta = await fb.getDoc(fb.doc(fb.db,'usuarios',emailKey));
+    if(snapMeta.exists()){
+      var d = snapMeta.data();
+      metaAgendadas  = d.metaAgendadas  || 25;
+      metaRealizadas = d.metaRealizadas || 20;
+      metaQualif     = d.metaQualif     || 15;
+    }
+  } catch(e){ console.warn('sdr meta err:', e); }
+
+  // Calcular metricas dos leads do SDR
+  var sdrLeads = getSdrLeads ? getSdrLeads() : [];
+  var ma = getMesAno();
+  if(document.getElementById('sdr-home-subtitulo'))
+    document.getElementById('sdr-home-subtitulo').textContent = ma.mes+' de '+ma.ano;
+
+  var totalLeads    = sdrLeads.length;
+  var agendadas     = sdrLeads.filter(function(l){ return l.dtInicial || l.dtAgendamento; }).length;
+  var realizadas    = sdrLeads.filter(function(l){
+    return l.statusInicial==='Realizada/Avancou' || l.statusInicial==='Realizada/Nao avancou';
+  }).length;
+  var qualifp       = sdrLeads.filter(function(l){ return l.qualificacao==='Qualificado+'; }).length;
+  var qualif        = sdrLeads.filter(function(l){ return l.qualificacao==='Qualificado'; }).length;
+  var naoQualif     = sdrLeads.filter(function(l){ return l.qualificacao==='Desqualificado'; }).length;
+  var noshow        = sdrLeads.filter(function(l){ return l.statusInicial==='Inicial No-Show'; }).length;
+  var vendidos      = sdrLeads.filter(function(l){ return l.status==='Vendido'; });
+  var totalVendido  = vendidos.reduce(function(s,l){ return s+(l.mrrServ||0)+(l.mrrBi||0)+(l.evento||0)+(l.impl||0)+(l.produto||0)+(l.projetoPersonalizado||0); }, 0);
+  var conv          = agendadas > 0 ? Math.round(vendidos.length/agendadas*100) : 0;
+
+  // Calculos de %
+  var pctAg   = metaAgendadas  > 0 ? Math.min(100, Math.round(agendadas/metaAgendadas*100))   : 0;
+  var pctReal = metaRealizadas > 0 ? Math.min(100, Math.round(realizadas/metaRealizadas*100)) : 0;
+  var pctQual = metaQualif     > 0 ? Math.min(100, Math.round((qualif+qualifp)/metaQualif*100)) : 0;
+
+  var pctAgReal  = agendadas  > 0 ? Math.round(agendadas/metaAgendadas*100)   : 0;
+  var pctRealReal= realizadas > 0 ? Math.round(realizadas/metaRealizadas*100) : 0;
+  var pctQReal   = (qualif+qualifp) > 0 ? Math.round((qualif+qualifp)/metaQualif*100) : 0;
+
+  function corPct(p){ return p>=100?'#1baf7a':p>=70?'#ff9940':'#e34948'; }
+  function bgPct(p){ return p>=100?'27,175,122':p>=70?'255,107,0':'227,73,72'; }
+  function fmtV(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+
+  function bigCard(label, val, meta, pctBar, pctReal2, subLabel, emoji){
+    var cor = corPct(pctBar);
+    var bg  = bgPct(pctBar);
+    var acima = pctReal2 > 100 ? Math.round(pctReal2 - 100) : 0;
+    return '<div style="background:rgba('+bg+',.06);border:.5px solid rgba('+bg+',.25);border-radius:16px;padding:1.6rem 1.8rem;display:flex;flex-direction:column;gap:6px">'
+      +'<div style="font-size:11px;font-weight:700;color:'+cor+';text-transform:uppercase;letter-spacing:.1em">'+label+'</div>'
+      +'<div style="font-size:40px;font-weight:900;color:'+cor+';line-height:1;margin:4px 0">'+val
+        +'<span style="font-size:16px;color:rgba(255,255,255,.4);font-weight:400;margin-left:6px">/ '+meta+'</span></div>'
+      +'<div style="font-size:12px;color:rgba(255,255,255,.35)">'+subLabel+'</div>'
+      +'<div style="margin-top:10px;background:rgba(255,255,255,.06);border-radius:8px;height:6px;overflow:hidden">'
+        +'<div style="height:6px;border-radius:8px;width:'+pctBar+'%;background:'+cor+'"></div>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">'
+        +'<span style="font-size:13px;font-weight:700;color:'+cor+'">'+pctReal2+'%</span>'
+        +(acima>0?'<span style="background:rgba(27,175,122,.2);color:#1baf7a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">+'+acima+'% acima '+emoji+'</span>':'')
+      +'</div>'
+      +'</div>';
+  }
+
+  function smallCard(lbl, val, sub, cor){
+    return '<div style="background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:12px;padding:1rem 1.2rem">'
+      +'<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">'+lbl+'</div>'
+      +'<div style="font-size:22px;font-weight:800;color:'+(cor||'#fff')+';line-height:1">'+val+'</div>'
+      +'<div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:3px">'+sub+'</div>'
+      +'</div>';
+  }
+
+  var bigCards = document.getElementById('sdr-home-cards-big');
+  var smCards  = document.getElementById('sdr-home-cards-small');
+
+  if(bigCards) bigCards.innerHTML =
+    bigCard('Reuniões agendadas', agendadas, metaAgendadas, pctAg, pctAgReal, 'leads com data de reunião', '🎯')
+    +bigCard('Reuniões realizadas', realizadas, metaRealizadas, pctReal, pctRealReal, 'statusInicial Realizada', '✅')
+    +bigCard('Qualificadas (Q+Q+)', qualif+qualifp, metaQualif, pctQual, pctQReal, 'Qualificado + Qualificado+', '⭐');
+
+  if(smCards) smCards.innerHTML =
+    smallCard('Total leads', totalLeads, 'cadastrados no mês', '#fff')
+    +smallCard('Qualificado+', qualifp, 'decisor + 2k assin', '#1baf7a')
+    +smallCard('Qualificado', qualif, 'acima de 2k assin', '#4fc3f7')
+    +smallCard('Não qualif.', naoQualif, 'desqualificados', '#ff9940')
+    +smallCard('No-shows', noshow, 'não compareceram', '#e34948')
+    +smallCard('Vendas originadas', vendidos.length, 'fechadas pelo closer', '#ff9940')
+    +smallCard('Volume gerado', fmtV(totalVendido), 'total combinado', '#1baf7a')
+    +smallCard('Conversão', conv+'%', 'agendadas → vendidas', '#ff6b00');
+
+  if(loadEl) loadEl.style.display='none';
+  if(contEl) contEl.style.display='block';
+}
+
+function uploadAvatarSdr(input){
+  var file = input.files[0];
+  if(!file) return;
+  if(file.size > 500000){ alert('Imagem muito grande. Use menor que 500KB.'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var base64 = e.target.result;
+    if(window._fb && currentUser){
+      var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+      window._fb.setDoc(window._fb.doc(window._fb.db,'usuarios',emailKey),{avatar:base64},{merge:true});
+    }
+    var circle = document.getElementById('sdr-avatar-circle');
+    if(circle) circle.innerHTML = '<img src="'+base64+'" style="width:80px;height:80px;border-radius:50%;object-fit:cover">';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function carregarAvatarSdr(){
+  if(!window._fb || !currentUser) return;
+  try {
+    var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+    var snap = await window._fb.getDoc(window._fb.doc(window._fb.db,'usuarios',emailKey));
+    if(snap.exists() && snap.data().avatar){
+      var circle = document.getElementById('sdr-avatar-circle');
+      if(circle) circle.innerHTML = '<img src="'+snap.data().avatar+'" style="width:80px;height:80px;border-radius:50%;object-fit:cover">';
+    }
+  } catch(e){}
 }
 
 // ==================== FIRESTORE INTEGRATION ====================
