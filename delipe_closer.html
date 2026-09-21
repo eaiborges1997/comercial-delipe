@@ -1803,7 +1803,13 @@ function getMetrics(){
 
 function recalc(){
   // Pre-carregar cache da campanha acumulada (async, nao bloqueia)
-  if(!_campanhaCache) calcularCampanhaAcumulada();
+  if(!_campanhaCache && !window._campanhaCarregando){
+    window._campanhaCarregando = true;
+    calcularCampanhaAcumulada().then(function(c){
+      window._campanhaCarregando = false;
+      if(c) recalc();
+    }).catch(function(){ window._campanhaCarregando = false; });
+  }
   var m=getMetrics();
 
   // nivel baseado no VALOR PAGO — calculado adiante junto com gatilhoAtingido
@@ -1945,6 +1951,9 @@ function recalc(){
   var acumC = _campanhaCache ? _campanhaCache.acumAteMesAtual : qtdMrrVend;
   var c1atingida  = acumC >= metaAcumC;
   var c1bonus     = c1atingida ? 2000 : 0;
+  // Bonus trimestral Q3: +R$ 5.000 se o acumulado do tri chegar a 18 (entra na comissao de setembro)
+  var triAtingidaProj = (mesIdxC === 8 && acumC >= 18);
+  var triBonusProj    = triAtingidaProj ? 5000 : 0;
 
   // Campanha 2: 80k total -> BI vira fixo 500/BI, 4+ BIs -> 700/BI
   // O valor do BI ja entra em calcComissao via comBi = qtdBi * valorBI
@@ -1991,6 +2000,16 @@ function recalc(){
         +'</div>'
         +'<div class="campanha-val">'+(c2ativa?'R$ '+valorPorBi+'/BI x '+qtdBiVend+' = '+ fmt(c2bonusDisplay):'faltam '+fmt(Math.max(80000-totalGerado,0)))+'</div>'
       +'</div>';
+    if(mesIdxC >= 6 && mesIdxC <= 8){
+      var accTri = _campanhaCache ? _campanhaCache.acumSet : acumC;
+      var triOk  = accTri >= 18;
+      cw.innerHTML +=
+        '<div class="campanha-card '+(triOk?'atingida':'ativa')+'">'
+          +'<div class="campanha-header"><span class="campanha-nome">Campanha 3 — Bonus trimestral de recorrencia</span>'
+          +(triOk?'<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(5000)+'</span>':'<span class="campanha-badge camp-pend">'+accTri+'/18 no tri</span>')+'</div>'
+          +'<div class="campanha-desc">18 recorrencias acumuladas no Q3 = bonus de R$ 5.000, pago na comissao de setembro</div>'
+        +'</div>';
+    }
   }
 
   function calcComissao(filtroLeads, nivelParam, c2ativo, valorBI){
@@ -2085,14 +2104,15 @@ function recalc(){
 
   // Projecao: sem gatilho — mostra sempre (e apenas projecao)
   // Real: so mostra se 70k pago atingido
-  var bonusProjTotal = c1bonus + c2bonus;
+  var bonusProjTotal = c1bonus + c2bonus + triBonusProj;
   // Bonus real da campanha 1 — usa acumulado de pagos do Q3
   var MESES_PT_R = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var mesIdxR = MESES_PT_R.indexOf(getMesAno().mes);
   var metaAcumPagoR = mesIdxR >= 8 ? 18 : mesIdxR >= 7 ? 12 : 6;
   var acumPagoR = _campanhaCache ? (mesIdxR >= 8 ? _campanhaCache.acumPagoSet : mesIdxR >= 7 ? _campanhaCache.acumPagoAgo : _campanhaCache.acumPagoJul) : qtdMrrPago;
   var c1bonusReal = acumPagoR >= metaAcumPagoR ? 2000 : 0;
-  var bonusRealTotal = gatilhoAtingido ? (c1bonusReal + c2bonusPago) : 0;
+  var triBonusReal = (mesIdxR === 8 && acumPagoR >= 18) ? 5000 : 0;
+  var bonusRealTotal = gatilhoAtingido ? (c1bonusReal + c2bonusPago + triBonusReal) : 0;
 
   // Bonus qualitativos — sempre mostrar (projeção), bloqueado só no real
   var br=document.getElementById('bonus-rows'); var totB=0;
