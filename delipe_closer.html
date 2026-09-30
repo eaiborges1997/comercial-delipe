@@ -1947,12 +1947,14 @@ function recalc(){
   var MESES_PT_C = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var maC = getMesAno();
   var mesIdxC = MESES_PT_C.indexOf(maC.mes);
-  var metaAcumC = mesIdxC >= 8 ? 18 : mesIdxC >= 7 ? 12 : 6;
-  var acumC = _campanhaCache ? _campanhaCache.acumAteMesAtual : qtdMrrVend;
+  var metaAcumC = _campanhaCache ? _campanhaCache.metaMesAtual : 6;
+  var acumC = _campanhaCache ? _campanhaCache.acumDesdeInicioMesAtual : qtdMrrVend;
+  var acumTriC = _campanhaCache ? _campanhaCache.acumRel[2] : qtdMrrVend;
+  var metaTriC = _campanhaCache ? _campanhaCache.metaTri : 18;
   var c1atingida  = acumC >= metaAcumC;
   var c1bonus     = c1atingida ? 2000 : 0;
   // Bonus trimestral Q3: +R$ 5.000 se o acumulado do tri chegar a 18 (entra na comissao de setembro)
-  var triAtingidaProj = (mesIdxC === 8 && acumC >= 18);
+  var triAtingidaProj = (mesIdxC === 8 && _campanhaCache && _campanhaCache.metaTriAtingida);
   var triBonusProj    = triAtingidaProj ? 5000 : 0;
 
   // Campanha 2: 80k total -> BI vira fixo 500/BI, 4+ BIs -> 700/BI
@@ -1983,7 +1985,7 @@ function recalc(){
     cw.innerHTML=
       '<div class="campanha-card '+c1cls+'">'
         +'<div class="campanha-header"><span class="campanha-nome">Campanha 1 — Bonus de recorrencia</span>'+c1badge+'</div>'
-        +'<div class="campanha-desc">Acumulado Q3: '+acumC+'/'+metaAcumC+' recorrencias (meta: 6/mes) = bonus de R$ 2.000</div>'
+        +'<div class="campanha-desc">Acumulado no tri: '+acumC+'/'+metaAcumC+' recorrencias (6/mes, um mes compensa o outro) = bonus de R$ 2.000</div>'
         +'<div class="campanha-progress">'
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>Acumulado: '+acumC+' recorrencias</span><span>meta: '+metaAcumC+'</span></div>'
           +'<div class="progress-bar"><div class="progress-fill'+(c1atingida?' green':'')+'" style="width:'+c1p+'%"></div></div>'
@@ -2001,13 +2003,14 @@ function recalc(){
         +'<div class="campanha-val">'+(c2ativa?'R$ '+valorPorBi+'/BI x '+qtdBiVend+' = '+ fmt(c2bonusDisplay):'faltam '+fmt(Math.max(80000-totalGerado,0)))+'</div>'
       +'</div>';
     if(mesIdxC >= 6 && mesIdxC <= 8){
-      var accTri = _campanhaCache ? _campanhaCache.acumSet : acumC;
-      var triOk  = accTri >= 18;
+      var accTri = acumTriC;
+      var triOk  = _campanhaCache ? _campanhaCache.metaTriAtingida : false;
+      var metaTriShow = _campanhaCache ? _campanhaCache.metaTri : 18;
       cw.innerHTML +=
         '<div class="campanha-card '+(triOk?'atingida':'ativa')+'">'
           +'<div class="campanha-header"><span class="campanha-nome">Campanha 3 — Bonus trimestral de recorrencia</span>'
-          +(triOk?'<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(5000)+'</span>':'<span class="campanha-badge camp-pend">'+accTri+'/18 no tri</span>')+'</div>'
-          +'<div class="campanha-desc">18 recorrencias acumuladas no Q3 = bonus de R$ 5.000, pago na comissao de setembro</div>'
+          +(triOk?'<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(5000)+'</span>':'<span class="campanha-badge camp-pend">'+accTri+'/'+metaTriShow+' no tri</span>')+'</div>'
+          +'<div class="campanha-desc">'+metaTriShow+' recorrencias acumuladas no Q3 = bonus de R$ 5.000, pago na comissao de setembro</div>'
         +'</div>';
     }
   }
@@ -2108,10 +2111,10 @@ function recalc(){
   // Bonus real da campanha 1 — usa acumulado de pagos do Q3
   var MESES_PT_R = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var mesIdxR = MESES_PT_R.indexOf(getMesAno().mes);
-  var metaAcumPagoR = mesIdxR >= 8 ? 18 : mesIdxR >= 7 ? 12 : 6;
-  var acumPagoR = _campanhaCache ? (mesIdxR >= 8 ? _campanhaCache.acumPagoSet : mesIdxR >= 7 ? _campanhaCache.acumPagoAgo : _campanhaCache.acumPagoJul) : qtdMrrPago;
+  var metaAcumPagoR = _campanhaCache ? _campanhaCache.metaMesAtual : 6;
+  var acumPagoR = _campanhaCache ? _campanhaCache.acumPagoDesdeInicioMesAtual : qtdMrrPago;
   var c1bonusReal = acumPagoR >= metaAcumPagoR ? 2000 : 0;
-  var triBonusReal = (mesIdxR === 8 && acumPagoR >= 18) ? 5000 : 0;
+  var triBonusReal = (mesIdxR === 8 && _campanhaCache && _campanhaCache.bonusTriPago > 0) ? 5000 : 0;
   var bonusRealTotal = gatilhoAtingido ? (c1bonusReal + c2bonusPago + triBonusReal) : 0;
 
   // Bonus qualitativos — sempre mostrar (projeção), bloqueado só no real
@@ -4275,6 +4278,7 @@ async function calcularCampanhaAcumulada(){
   var mesesQ3 = ['Julho','Agosto','Setembro'];
 
   // Contar recorrencias (MRR>0) vendidas (status Vendido) por mes
+  var mesesComDados  = {Julho:false, Agosto:false, Setembro:false};
   var recPorMes      = {Julho:0, Agosto:0, Setembro:0};
   var recPagosPorMes = {Julho:0, Agosto:0, Setembro:0};
 
@@ -4283,6 +4287,7 @@ async function calcularCampanhaAcumulada(){
     try {
       var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
       if(snap.exists() && snap.data().leads){
+        if(snap.data().leads.length > 0) mesesComDados[mesesQ3[i]] = true;
         snap.data().leads.forEach(function(l){
           if(l.status==='Vendido' && ((l.mrrServ||0)>0 || (l.mrrBi||0)>0)){
             recPorMes[mesesQ3[i]]++;
@@ -4298,11 +4303,21 @@ async function calcularCampanhaAcumulada(){
   var acumAgo = acumJul + recPorMes['Agosto'];
   var acumSet = acumAgo + recPorMes['Setembro'];
 
-  var bonusJul = acumJul >= 6  ? 2000 : 0;
-  var bonusAgo = acumAgo >= 12 ? 2000 : 0;
-  var bonusSet = acumSet >= 18 ? 2000 : 0;
+  // Bonus mensal ACUMULADO no trimestre — um mes compensa o outro.
+  // A meta so comeca a contar no 1o mes em que o closer tem leads lancados.
+  var primeiroMes = mesesComDados['Julho'] ? 0 : mesesComDados['Agosto'] ? 1 : mesesComDados['Setembro'] ? 2 : 0;
+  function metaDoMes(idx){ return idx < primeiroMes ? 0 : (idx - primeiroMes + 1) * 6; }
+  function acumDoMes(idx){ return idx===0 ? acumJul : idx===1 ? acumAgo : acumSet; }
+  function acumDesdeInicio(idx){
+    var base = primeiroMes===0 ? 0 : primeiroMes===1 ? acumJul : acumAgo;
+    return acumDoMes(idx) - base;
+  }
+  var bonusJul = (primeiroMes<=0 && acumDesdeInicio(0) >= metaDoMes(0)) ? 2000 : 0;
+  var bonusAgo = (primeiroMes<=1 && acumDesdeInicio(1) >= metaDoMes(1)) ? 2000 : 0;
+  var bonusSet = (primeiroMes<=2 && acumDesdeInicio(2) >= metaDoMes(2)) ? 2000 : 0;
   // Bonus trimestral: R$ 5.000 se o acumulado do trimestre chegar a 18 ou mais (sem minimo por mes)
-  var metaTriAtingida = acumSet >= 18;
+  var metaTri = metaDoMes(2); // 18 com o tri inteiro; 12 se comecou em agosto; 6 se so setembro
+  var metaTriAtingida = acumDesdeInicio(2) >= metaTri;
   var bonusTri = metaTriAtingida ? 5000 : 0;
   var totalBonus = bonusJul + bonusAgo + bonusSet + bonusTri;
 
@@ -4311,10 +4326,15 @@ async function calcularCampanhaAcumulada(){
   var acumPagoAgo = acumPagoJul + recPagosPorMes['Agosto'];
   var acumPagoSet = acumPagoAgo + recPagosPorMes['Setembro'];
 
-  var bonusPagoJul = acumPagoJul >= 6  ? 2000 : 0;
-  var bonusPagoAgo = acumPagoAgo >= 12 ? 2000 : 0;
-  var bonusPagoSet = acumPagoSet >= 18 ? 2000 : 0;
-  var bonusTriPago = acumPagoSet >= 18 ? 5000 : 0;
+  function acumPagoDoMes(idx){ return idx===0 ? acumPagoJul : idx===1 ? acumPagoAgo : acumPagoSet; }
+  function acumPagoDesdeInicio(idx){
+    var baseP = primeiroMes===0 ? 0 : primeiroMes===1 ? acumPagoJul : acumPagoAgo;
+    return acumPagoDoMes(idx) - baseP;
+  }
+  var bonusPagoJul = (primeiroMes<=0 && acumPagoDesdeInicio(0) >= metaDoMes(0)) ? 2000 : 0;
+  var bonusPagoAgo = (primeiroMes<=1 && acumPagoDesdeInicio(1) >= metaDoMes(1)) ? 2000 : 0;
+  var bonusPagoSet = (primeiroMes<=2 && acumPagoDesdeInicio(2) >= metaDoMes(2)) ? 2000 : 0;
+  var bonusTriPago = acumPagoDesdeInicio(2) >= metaTri ? 5000 : 0;
   var totalBonusPago = bonusPagoJul + bonusPagoAgo + bonusPagoSet + bonusTriPago;
 
   // Mes atual do Q3 para saber o que ja passou
@@ -4347,8 +4367,18 @@ async function calcularCampanhaAcumulada(){
     mesAtualIdx: mesIdx,
     // Acumulado ate o mes atual
     acumAteMesAtual: mesIdx >= 8 ? acumSet : mesIdx >= 7 ? acumAgo : acumJul,
-    metaAteMesAtual: mesIdx >= 8 ? 18 : mesIdx >= 7 ? 12 : 6,
+    metaAteMesAtual: metaDoMes(mesIdx >= 8 ? 2 : mesIdx >= 7 ? 1 : 0),
     bonusAteMesAtual: mesIdx >= 8 ? (bonusJul+bonusAgo+bonusSet+bonusTri) : mesIdx >= 7 ? (bonusJul+bonusAgo) : bonusJul,
+    primeiroMes: primeiroMes,
+    acumRel: [acumDesdeInicio(0), acumDesdeInicio(1), acumDesdeInicio(2)],
+    metaRel: [metaDoMes(0), metaDoMes(1), metaDoMes(2)],
+    metaTri: metaTri,
+    metaMesAtual: metaDoMes(mesIdx >= 8 ? 2 : mesIdx >= 7 ? 1 : 0),
+    acumDesdeInicioMesAtual: acumDesdeInicio(mesIdx >= 8 ? 2 : mesIdx >= 7 ? 1 : 0),
+    acumPagoDesdeInicioMesAtual: acumPagoDesdeInicio(mesIdx >= 8 ? 2 : mesIdx >= 7 ? 1 : 0),
+    recMesAtual: mesIdx >= 8 ? recPorMes['Setembro'] : mesIdx >= 7 ? recPorMes['Agosto'] : recPorMes['Julho'],
+    recPagoMesAtual: mesIdx >= 8 ? recPagosPorMes['Setembro'] : mesIdx >= 7 ? recPagosPorMes['Agosto'] : recPagosPorMes['Julho'],
+    bonusMesAtual: mesIdx >= 8 ? bonusSet : mesIdx >= 7 ? bonusAgo : bonusJul,
   };
   return _campanhaCache;
 }
@@ -4357,11 +4387,11 @@ function renderCampanhaAcumuladaHome(cache){
   var wrap = document.getElementById('home-campanha-wrap');
   if(!wrap || !cache) return;
 
-  var pct = cache.metaAteMesAtual > 0 ? Math.min(100, Math.round(cache.acumAteMesAtual / cache.metaAteMesAtual * 100)) : 0;
+  var pct = cache.metaAteMesAtual > 0 ? Math.min(100, Math.round(cache.acumDesdeInicioMesAtual / cache.metaAteMesAtual * 100)) : 0;
   var meses = [
-    {nome:'Julho', rec:cache.recJul, acum:cache.acumJul, meta:6,  bonus:cache.bonusJul},
-    {nome:'Agosto', rec:cache.recAgo, acum:cache.acumAgo, meta:12, bonus:cache.bonusAgo},
-    {nome:'Setembro', rec:cache.recSet, acum:cache.acumSet, meta:18, bonus:cache.bonusSet},
+    {nome:'Julho', rec:cache.recJul, acum:cache.acumRel[0], meta:cache.metaRel[0], bonus:cache.bonusJul},
+    {nome:'Agosto', rec:cache.recAgo, acum:cache.acumRel[1], meta:cache.metaRel[1], bonus:cache.bonusAgo},
+    {nome:'Setembro', rec:cache.recSet, acum:cache.acumRel[2], meta:cache.metaRel[2], bonus:cache.bonusSet},
   ];
 
   var mesesHtml = meses.map(function(m){
@@ -4374,24 +4404,24 @@ function renderCampanhaAcumuladaHome(cache){
     return '<div style="flex:1;min-width:90px;background:'+bg+';border:.5px solid '+bdr+';border-radius:10px;padding:10px 12px;text-align:center">'
       +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">'+m.nome+'</div>'
       +'<div style="font-size:20px;font-weight:800;color:'+cor+'">'+m.rec+'</div>'
-      +'<div style="font-size:10px;color:rgba(255,255,255,.3)">acum: '+m.acum+'/'+m.meta+'</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.3)">'+(m.meta>0?'acum: '+m.acum+'/'+m.meta:'fora do periodo')+'</div>'
       +'<div style="font-size:11px;font-weight:700;color:'+cor+';margin-top:4px">'+icon+' '+(atingiu?'R$ 2.000':futuro?'pendente':'sem bônus')+'</div>'
     +'</div>';
   }).join('');
 
   wrap.innerHTML = '<div class="home-campanha-card">'
     +'<div class="hcc-label"><span class="hcc-trophy">🏆</span> Campanha de Recorrências — Q3 2026</div>'
-    +'<div class="hcc-meta">Acumulado progressivo · <strong style="color:#ff9940">6/mês = R$ 2.000 de bônus</strong> · 18 no tri = <strong style="color:#ff9940">+R$ 5.000</strong> · máx R$ 11.000</div>'
+    +'<div class="hcc-meta">Acumulado no trimestre · <strong style="color:#ff9940">6/mês = R$ 2.000</strong> · meta cheia no tri = <strong style="color:#ff9940">+R$ 5.000</strong> · máx R$ 11.000</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+mesesHtml+'</div>'
     +'<div class="hcc-bar-wrap"><div class="hcc-bar-inner'+(pct>=100?' full':'')+'" style="width:'+pct+'%"></div></div>'
     +'<div class="hcc-pct-row" style="margin-bottom:10px">'
-      +'<span style="color:'+(pct>=100?'#1baf7a':'#ff9940')+';font-weight:700">Acumulado: '+cache.acumAteMesAtual+' / '+cache.metaAteMesAtual+' recorrências ('+pct+'%)</span>'
+      +'<span style="color:'+(pct>=100?'#1baf7a':'#ff9940')+';font-weight:700">Acumulado: '+cache.acumDesdeInicioMesAtual+' / '+cache.metaAteMesAtual+' recorrências ('+pct+'%)</span>'
       +'<span style="color:rgba(255,255,255,.4);font-weight:700">Bônus ganho: R$ '+cache.bonusAteMesAtual.toLocaleString('pt-BR')+'</span>'
     +'</div>'
     +(function(){
         var cor=cache.metaTriAtingida?'#1baf7a':'#ff9940';
         return '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(255,107,0,.06);border:.5px solid '+(cache.metaTriAtingida?'rgba(27,175,122,.3)':'rgba(255,107,0,.2)')+';border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
-          +'<span style="font-size:12px;color:rgba(255,255,255,.6)">🎯 Bônus trimestral — 18 recorrências no tri: <strong style="color:'+cor+'">'+cache.acumSet+' / 18</strong></span>'
+          +'<span style="font-size:12px;color:rgba(255,255,255,.6)">🎯 Bônus trimestral — '+cache.metaTri+' recorrências no tri: <strong style="color:'+cor+'">'+cache.acumRel[2]+' / '+cache.metaTri+'</strong></span>'
           +'<span style="font-size:13px;font-weight:800;color:'+(cache.metaTriAtingida?'#1baf7a':'rgba(255,255,255,.3)')+'">'+(cache.metaTriAtingida?'+ R$ 5.000':'R$ 5.000 em jogo')+'</span>'
         +'</div>';
       })()
