@@ -1985,7 +1985,7 @@ function recalc(){
     cw.innerHTML=
       '<div class="campanha-card '+c1cls+'">'
         +'<div class="campanha-header"><span class="campanha-nome">Campanha 1 — Bonus de recorrencia</span>'+c1badge+'</div>'
-        +'<div class="campanha-desc">'+acumC+' recorrencias acumuladas no tri · cada 6 = R$ 2.000 (max 3 blocos)</div>'
+        +'<div class="campanha-desc">'+acumC+' recorrencias acumuladas no tri · a cada 6 acumuladas o mes ganha R$ 2.000</div>'
         +'<div class="campanha-progress">'
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>Acumulado: '+acumC+' recorrencias</span><span>meta: '+metaAcumC+'</span></div>'
           +'<div class="progress-bar"><div class="progress-fill'+(c1atingida?' green':'')+'" style="width:'+c1p+'%"></div></div>'
@@ -2178,7 +2178,7 @@ function recalc(){
             +'<td style="padding:8px 0;color:#fff;font-weight:500">'+r.mes+'</td>'
             +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.7)">'+r.rec+'</td>'
             +'<td style="padding:8px;text-align:center;color:'+cor+';font-weight:700">'+r.acum+' / '+r.meta+'</td>'
-            +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.4)">cada 6 acum.</td>'
+            +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.4)">&ge; '+r.meta+' acum.</td>'
             +'<td style="padding:8px;text-align:right;font-weight:700;color:'+(r.bonus>0?'#1baf7a':'rgba(255,255,255,.25)')+'">'+(r.bonus>0?'+ R$ '+r.bonus.toLocaleString('pt-BR'):'—')+'</td>'
           +'</tr>';
         }).join('')
@@ -4330,9 +4330,10 @@ async function calcularCampanhaAcumulada(){
   // Nao importa o mes: 12 em julho ja garante o bonus de julho e agosto.
   function blocos(acum){ return Math.min(3, Math.floor(acum / 6)); }
   var blocosJul = blocos(acumJul), blocosAgo = blocos(acumAgo), blocosSet = blocos(acumSet);
-  var bonusJul = blocosJul * 2000;
-  var bonusAgo = (blocosAgo - blocosJul) * 2000;
-  var bonusSet = (blocosSet - blocosAgo) * 2000;
+  // Maximo de R$ 2.000 por mes: ganha no mes em que o acumulado cruza um novo bloco de 6.
+  var bonusJul = blocosJul > 0 ? 2000 : 0;
+  var bonusAgo = blocosAgo > blocosJul ? 2000 : 0;
+  var bonusSet = blocosSet > blocosAgo ? 2000 : 0;
   // Bonus trimestral: R$ 5.000 se o acumulado do trimestre chegar a 18 ou mais (sem minimo por mes)
   // Bonus trimestral: SEMPRE 18 recorrencias no Q3, independente de quando o closer entrou
   var metaTri = 18;
@@ -4346,9 +4347,9 @@ async function calcularCampanhaAcumulada(){
   var acumPagoSet = acumPagoAgo + recPagosPorMes['Setembro'];
 
   var blocosPagoJul = blocos(acumPagoJul), blocosPagoAgo = blocos(acumPagoAgo), blocosPagoSet = blocos(acumPagoSet);
-  var bonusPagoJul = blocosPagoJul * 2000;
-  var bonusPagoAgo = (blocosPagoAgo - blocosPagoJul) * 2000;
-  var bonusPagoSet = (blocosPagoSet - blocosPagoAgo) * 2000;
+  var bonusPagoJul = blocosPagoJul > 0 ? 2000 : 0;
+  var bonusPagoAgo = blocosPagoAgo > blocosPagoJul ? 2000 : 0;
+  var bonusPagoSet = blocosPagoSet > blocosPagoAgo ? 2000 : 0;
   var bonusTriPago = acumPagoSet >= metaTri ? 5000 : 0;
   var totalBonusPago = bonusPagoJul + bonusPagoAgo + bonusPagoSet + bonusTriPago;
 
