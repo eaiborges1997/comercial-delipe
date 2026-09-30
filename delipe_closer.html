@@ -1803,6 +1803,7 @@ function getMetrics(){
 
 function recalc(){
   // Pre-carregar cache da campanha acumulada (async, nao bloqueia)
+  if(_campanhaCache && window._campanhaCacheEmail && window._campanhaCacheEmail !== emailAtivo()) _campanhaCache = null;
   if(!_campanhaCache && !window._campanhaCarregando){
     window._campanhaCarregando = true;
     calcularCampanhaAcumulada().then(function(c){
@@ -2492,7 +2493,10 @@ async function adminVerMeusDados(){
   var ma = getMesAno();
   var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
   var chave = emailKey + '__' + ma.mes + '_' + ma.ano;
+  _campanhaCache = null;
+  window._campanhaCacheEmail = null;
   await carregarDoFirestore(chave);
+  await _recarregarTelasDoCloser();
   setSyncStatus('connected','Visualizando seus proprios dados');
 }
 
@@ -2509,8 +2513,23 @@ async function adminTrocarCloser(){
   var ma = getMesAno();
   var emailKey = email.replace(/[^a-zA-Z0-9]/g,'_');
   var chave = emailKey + '__' + ma.mes + '_' + ma.ano;
+  _campanhaCache = null;
+  window._campanhaCacheEmail = null;
   await carregarDoFirestore(chave);
+  await _recarregarTelasDoCloser();
   setSyncStatus('connected','Admin — visualizando: '+nomeExib);
+}
+
+// Recarrega Home / Carteira / Trimestre com os dados do closer ativo
+async function _recarregarTelasDoCloser(){
+  try {
+    if(typeof carregarHome === 'function') await carregarHome();
+    var abaCart = document.getElementById('tab-carteira');
+    if(abaCart && abaCart.classList.contains('active') && typeof carregarCarteira === 'function') await carregarCarteira();
+    var abaTri = document.getElementById('tab-trimestre');
+    if(abaTri && abaTri.classList.contains('active') && typeof carregarTrimestre === 'function') await carregarTrimestre();
+    if(typeof recalc === 'function') recalc();
+  } catch(e){ console.warn('recarregar telas:', e); }
 }
 
 async function adminVerConsolidado(){
@@ -3859,15 +3878,17 @@ async function carregarHome(){
     if(pk) pk.style.display = 'block';
   }
 
-  // Nome
-  var nome = (currentUser.displayName || currentUser.nome || currentUser.email.split('@')[0]);
+  // Nome — se o admin estiver vendo outro closer, mostrar o nome dele
+  var nome = (isAdmin && window._viewingEmail)
+    ? ((PERFIS_CACHE[window._viewingEmail] && PERFIS_CACHE[window._viewingEmail].nome) || window._viewingEmail.split('@')[0])
+    : (currentUser.displayName || currentUser.nome || currentUser.email.split('@')[0]);
   var nomeEl = document.getElementById('home-nome');
   if(nomeEl) nomeEl.textContent = nome.split(' ')[0];
   var inicialEl = document.getElementById('home-avatar-inicial');
   if(inicialEl) inicialEl.textContent = nome.charAt(0).toUpperCase();
 
   var fb = window._fb;
-  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var emailKey = emailKeyAtivo();
   var metaMensal = 100000, metaTrimestral = 300000;
 
   // Buscar metas (nao bloquear se falhar)
@@ -4064,7 +4085,7 @@ async function carregarCarteira(){
   document.getElementById('cart-loading').style.display='block';
   document.getElementById('cart-grid').style.display='none';
   var fb = window._fb;
-  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var emailKey = emailKeyAtivo();
 
   try {
     // Carregar status salvo no Firestore
@@ -4231,7 +4252,7 @@ function toggleCartCard(i){
 async function _salvarCarteira(){
   if(!currentUser || !window._fb) return;
   var fb = window._fb;
-  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var emailKey = emailKeyAtivo();
   // Serializar apenas os campos de status (nao os dados calculados)
   var toSave = {};
   Object.keys(_carteiraData).forEach(function(cnpj){
@@ -4273,7 +4294,8 @@ var _campanhaCache = null; // { recJul, recAgo, recSet, acumAteJul, acumAteAgo, 
 async function calcularCampanhaAcumulada(){
   if(!currentUser || !window._fb) return null;
   var fb = window._fb;
-  var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
+  var emailKey = emailKeyAtivo();
+  window._campanhaCacheEmail = emailAtivo();
   var ano = '2026';
   var mesesQ3 = ['Julho','Agosto','Setembro'];
 
@@ -5086,6 +5108,13 @@ function getMesAno(){
   var ar = document.getElementById('ano-ref'); if(ar) ar.value = ano;
   return {mes:mes, ano:ano};
 }
+
+// Email do closer que esta sendo visualizado (admin pode ver outro closer)
+function emailAtivo(){
+  if(isAdmin && window._viewingEmail) return window._viewingEmail;
+  return currentUser ? currentUser.email : '';
+}
+function emailKeyAtivo(){ return emailAtivo().replace(/[^a-zA-Z0-9]/g,'_'); }
 
 function getCloserKey(){
   // Chave unica por usuario + mes + ano
