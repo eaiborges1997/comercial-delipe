@@ -2003,7 +2003,7 @@ function recalc(){
         +'<div class="campanha-val">'+(c2ativa?'R$ '+valorPorBi+'/BI x '+qtdBiVend+' = '+ fmt(c2bonusDisplay):'faltam '+fmt(Math.max(80000-totalGerado,0)))+'</div>'
       +'</div>';
     if(mesIdxC >= 6 && mesIdxC <= 8){
-      var accTri = acumTriC;
+      var accTri = _campanhaCache ? _campanhaCache.acumSet : acumTriC;
       var triOk  = _campanhaCache ? _campanhaCache.metaTriAtingida : false;
       var metaTriShow = _campanhaCache ? _campanhaCache.metaTri : 18;
       cw.innerHTML +=
@@ -4316,8 +4316,9 @@ async function calcularCampanhaAcumulada(){
   var bonusAgo = (primeiroMes<=1 && acumDesdeInicio(1) >= metaDoMes(1)) ? 2000 : 0;
   var bonusSet = (primeiroMes<=2 && acumDesdeInicio(2) >= metaDoMes(2)) ? 2000 : 0;
   // Bonus trimestral: R$ 5.000 se o acumulado do trimestre chegar a 18 ou mais (sem minimo por mes)
-  var metaTri = metaDoMes(2); // 18 com o tri inteiro; 12 se comecou em agosto; 6 se so setembro
-  var metaTriAtingida = acumDesdeInicio(2) >= metaTri;
+  // Bonus trimestral: SEMPRE 18 recorrencias no Q3, independente de quando o closer entrou
+  var metaTri = 18;
+  var metaTriAtingida = acumSet >= metaTri;
   var bonusTri = metaTriAtingida ? 5000 : 0;
   var totalBonus = bonusJul + bonusAgo + bonusSet + bonusTri;
 
@@ -4334,7 +4335,7 @@ async function calcularCampanhaAcumulada(){
   var bonusPagoJul = (primeiroMes<=0 && acumPagoDesdeInicio(0) >= metaDoMes(0)) ? 2000 : 0;
   var bonusPagoAgo = (primeiroMes<=1 && acumPagoDesdeInicio(1) >= metaDoMes(1)) ? 2000 : 0;
   var bonusPagoSet = (primeiroMes<=2 && acumPagoDesdeInicio(2) >= metaDoMes(2)) ? 2000 : 0;
-  var bonusTriPago = acumPagoDesdeInicio(2) >= metaTri ? 5000 : 0;
+  var bonusTriPago = acumPagoSet >= metaTri ? 5000 : 0;
   var totalBonusPago = bonusPagoJul + bonusPagoAgo + bonusPagoSet + bonusTriPago;
 
   // Mes atual do Q3 para saber o que ja passou
@@ -4421,7 +4422,7 @@ function renderCampanhaAcumuladaHome(cache){
     +(function(){
         var cor=cache.metaTriAtingida?'#1baf7a':'#ff9940';
         return '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(255,107,0,.06);border:.5px solid '+(cache.metaTriAtingida?'rgba(27,175,122,.3)':'rgba(255,107,0,.2)')+';border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
-          +'<span style="font-size:12px;color:rgba(255,255,255,.6)">🎯 Bônus trimestral — '+cache.metaTri+' recorrências no tri: <strong style="color:'+cor+'">'+cache.acumRel[2]+' / '+cache.metaTri+'</strong></span>'
+          +'<span style="font-size:12px;color:rgba(255,255,255,.6)">🎯 Bônus trimestral — 18 recorrências no tri: <strong style="color:'+cor+'">'+cache.acumSet+' / 18</strong></span>'
           +'<span style="font-size:13px;font-weight:800;color:'+(cache.metaTriAtingida?'#1baf7a':'rgba(255,255,255,.3)')+'">'+(cache.metaTriAtingida?'+ R$ 5.000':'R$ 5.000 em jogo')+'</span>'
         +'</div>';
       })()
