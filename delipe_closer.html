@@ -1105,7 +1105,7 @@ var leadId = 0;
 
 var CANAIS   = ['Trafego Pago','Evento','SDR','Base','Indicacao'];
 var SDRS     = ['LUCAS','ADRIELLE','CLEITO','PAULO','VINI','DAVID','SABRINA','GABRIEL','CLEITON','GREISON','DANILO','MAURICIO','OUTRO'];
-var CLOSERS  = ['Lucas','David','Sabrina','Gabriel','Cleiton','Greison','Danilo','Mauricio'];
+var CLOSERS  = ['Lucas','Gabriel'];
 // Mapeamento email -> nome SDR para filtrar leads
 var SDR_EMAILS = {
   'adrielle@delipe.com': 'ADRIELLE',
@@ -4517,7 +4517,7 @@ function exportarModeloXLSX(){
   // Cada coluna tem uma lista de valores — Excel limita formula a 255 chars
   // então colocamos as listas em células e referenciamos via INDIRECT
   var SDRS_LISTA    = ['LUCAS','ADRIELLE','CLEITO','PAULO','VINI','DAVID','SABRINA','GABRIEL','CLEITON','GREISON','DANILO','MAURICIO','OUTRO'];
-  var CLOSERS_LISTA = ['Lucas','David','Sabrina','Gabriel','Cleiton','Greison','Danilo','Mauricio'];
+  var CLOSERS_LISTA = ['Lucas','Gabriel'];
   var SERVICOS_LISTA= SERVICOS.length > 0 ? SERVICOS : ['Assessoria Comercial','BI','Delipe One','Diag 360','Site'];
   var CANAIS_LISTA  = ['Trafego Pago','Indicacao','Base','Evento','SDR','Outbound'];
   var STATUS_LISTA  = ['Novo Lead','Contato Feito','Respondeu','Inicial Agendada','Inicial No-Show','Telefone Invalido','Nao e Provedor','Declinou','Cortesia','Em negociacao','Negociacao','Nao convertido','Vendido'];
