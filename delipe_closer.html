@@ -3832,7 +3832,7 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     )
     +'</div>'
 
-    +'<div style="background:rgba('+bgPct+',.06);border:.5px solid rgba('+bgPct+',.25);border-radius:16px;padding:1.6rem 1.8rem;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center">'
+    +'<div onclick="abrirLeadsMeta()" title="Ver os leads que compoem a meta" style="cursor:pointer;background:rgba('+bgPct+',.06);border:.5px solid rgba('+bgPct+',.25);border-radius:16px;padding:1.6rem 1.8rem;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center">'
     +'<div style="font-size:11px;font-weight:700;color:'+corPct+';text-transform:uppercase;letter-spacing:.1em">Realizado</div>'
     +'<div style="font-size:64px;font-weight:900;color:'+corPct+';line-height:1;margin:8px 0">'+pctVend+'<span style="font-size:28px;font-weight:700">%</span></div>'
     +'<div style="font-size:12px;color:rgba(255,255,255,.35)">da meta</div>'
@@ -3906,6 +3906,7 @@ async function carregarHome(){
 
   var ma = getMesAno();
   var totalComb = 0, totalPago = 0, leadsMulti = [];
+  window._homeLeadsMeta = [];   // leads vendidos que compoem a meta (para o detalhamento)
 
   try {
     if(_homeView === 'mes'){
@@ -3923,13 +3924,16 @@ async function carregarHome(){
           if(snapM.exists() && snapM.data().leads){
             var leadsM = snapM.data().leads;
             leadsMulti = leadsMulti.concat(leadsM);
-            leadsM.forEach(function(l){
-              if(l.status==='Vendido'){
-                var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
-                totalComb += comb;
-                if(l.pago==='Pago') totalPago += comb;
-              }
-            });
+            (function(mesLead){
+              leadsM.forEach(function(l){
+                if(l.status==='Vendido'){
+                  var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+                  totalComb += comb;
+                  if(l.pago==='Pago') totalPago += comb;
+                  window._homeLeadsMeta.push({emp:l.empresa||l.nome||'(sem nome)', canal:l.canal||'—', mes:mesLead, valor:comb, pago:l.pago==='Pago', closer:l.closer||''});
+                }
+              });
+            })(mesesSel[mi]);
           }
         } catch(eM){ console.warn('home mes err:', mesesSel[mi], eM); }
       }
@@ -3953,13 +3957,16 @@ async function carregarHome(){
           var chave = emailKey+'__'+mesesTri[i]+'_'+ma.ano;
           var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
           if(snap.exists() && snap.data().leads){
-            snap.data().leads.forEach(function(l){
-              if(l.status==='Vendido'){
-                var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
-                totalComb += comb;
-                if(l.pago==='Pago') totalPago += comb;
-              }
-            });
+            (function(mesLead){
+              snap.data().leads.forEach(function(l){
+                if(l.status==='Vendido'){
+                  var comb=(l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+                  totalComb += comb;
+                  if(l.pago==='Pago') totalPago += comb;
+                  window._homeLeadsMeta.push({emp:l.empresa||l.nome||'(sem nome)', canal:l.canal||'—', mes:mesLead, valor:comb, pago:l.pago==='Pago', closer:l.closer||''});
+                }
+              });
+            })(mesesTri[i]);
           }
         } catch(eT){ console.warn('home tri err:', mesesTri[i], eT); }
       }
@@ -3979,6 +3986,77 @@ async function carregarHome(){
   }
 }
 
+
+// ---- Detalhamento dos leads que compoem a meta (clique no card Realizado) ----
+function fecharLeadsMeta(){
+  var ov = document.getElementById('leads-meta-overlay');
+  if(ov) ov.remove();
+}
+
+function abrirLeadsMeta(filtro){
+  var leads = window._homeLeadsMeta || [];
+  filtro = filtro || 'todos';   // todos | pagos | pendentes
+  fecharLeadsMeta();
+  var lista = leads.filter(function(l){
+    return filtro==='pagos' ? l.pago : filtro==='pendentes' ? !l.pago : true;
+  }).sort(function(a,b){ return b.valor - a.valor; });
+
+  var totalTodos = leads.reduce(function(t,l){return t+l.valor;},0);
+  var totalPagos = leads.filter(function(l){return l.pago;}).reduce(function(t,l){return t+l.valor;},0);
+  var totalLista = lista.reduce(function(t,l){return t+l.valor;},0);
+  function btn(k,txt,n){
+    var on = filtro===k;
+    return '<button onclick="abrirLeadsMeta(\''+k+'\')" style="cursor:pointer;border:.5px solid '+(on?'rgba(255,107,0,.5)':'rgba(255,255,255,.12)')+';background:'+(on?'rgba(255,107,0,.15)':'transparent')+';color:'+(on?'#ff9940':'rgba(255,255,255,.6)')+';font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px">'+txt+' ('+n+')</button>';
+  }
+
+  var ov = document.createElement('div');
+  ov.id = 'leads-meta-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,6,20,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick = function(e){ if(e.target===ov) fecharLeadsMeta(); };
+  ov.innerHTML =
+    '<div style="background:#1a1030;border:.5px solid rgba(255,255,255,.12);border-radius:16px;max-width:900px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">'
+      +'<div style="padding:18px 22px;border-bottom:.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+        +'<div>'
+          +'<div style="font-size:11px;font-weight:700;color:#ff9940;text-transform:uppercase;letter-spacing:.1em">Leads que compoem a meta</div>'
+          +'<div style="font-size:13px;color:rgba(255,255,255,.45);margin-top:4px">Vendido: '+_homeF(totalTodos)+' · Pago: '+_homeF(totalPagos)+'</div>'
+        +'</div>'
+        +'<button onclick="fecharLeadsMeta()" style="cursor:pointer;background:transparent;border:.5px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:8px;padding:6px 12px;font-size:13px">Fechar</button>'
+      +'</div>'
+      +'<div style="padding:12px 22px;display:flex;gap:8px;flex-wrap:wrap">'
+        +btn('todos','Todos', leads.length)
+        +btn('pagos','Pagos', leads.filter(function(l){return l.pago;}).length)
+        +btn('pendentes','A receber', leads.filter(function(l){return !l.pago;}).length)
+      +'</div>'
+      +'<div style="overflow:auto;padding:0 22px 22px">'
+        +(lista.length===0
+          ? '<div style="padding:30px;text-align:center;color:rgba(255,255,255,.35);font-size:14px">Nenhum lead nesse filtro.</div>'
+          : '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+            +'<thead><tr style="color:rgba(255,255,255,.4);font-size:11px;text-transform:uppercase;letter-spacing:.06em">'
+              +'<th style="padding:8px 0;text-align:left">Empresa</th>'
+              +'<th style="padding:8px;text-align:left">Canal</th>'
+              +'<th style="padding:8px;text-align:center">Mes</th>'
+              +'<th style="padding:8px;text-align:center">Pagamento</th>'
+              +'<th style="padding:8px;text-align:right">Valor</th>'
+            +'</tr></thead><tbody>'
+            +lista.map(function(l){
+              return '<tr style="border-top:.5px solid rgba(255,255,255,.06)">'
+                +'<td style="padding:9px 0;color:#fff;font-weight:500">'+l.emp+'</td>'
+                +'<td style="padding:9px;color:rgba(255,255,255,.55)">'+l.canal+'</td>'
+                +'<td style="padding:9px;text-align:center;color:rgba(255,255,255,.45)">'+l.mes+'</td>'
+                +'<td style="padding:9px;text-align:center"><span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:'+(l.pago?'rgba(27,175,122,.18);color:#1baf7a':'rgba(255,107,0,.15);color:#ff9940')+'">'+(l.pago?'Pago':'A receber')+'</span></td>'
+                +'<td style="padding:9px;text-align:right;color:#fff;font-weight:700">'+_homeF(l.valor)+'</td>'
+              +'</tr>';
+            }).join('')
+            +'</tbody><tfoot><tr style="border-top:.5px solid rgba(255,255,255,.15)">'
+              +'<td colspan="4" style="padding:10px 0;color:rgba(255,255,255,.5);font-weight:600">Total exibido ('+lista.length+' leads)</td>'
+              +'<td style="padding:10px 0;text-align:right;color:#ff9940;font-weight:800">'+_homeF(totalLista)+'</td>'
+            +'</tr></tfoot></table>')
+      +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+window.abrirLeadsMeta  = abrirLeadsMeta;
+window.fecharLeadsMeta = fecharLeadsMeta;
 
 async function carregarHomeTime(){
   var fb = window._fb;
