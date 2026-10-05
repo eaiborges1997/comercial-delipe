@@ -868,7 +868,15 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
         <div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:6px">Meta mensal (Total Combinado)</div>
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:13px;color:rgba(255,255,255,.4)">R$</span>
-          <input type="number" id="meta-mensal-input" placeholder="100000" min="0" step="1000"
+          <input type="number" id="meta-mensal-input" placeholder="125000" min="0" step="1000"
+            style="flex:1;padding:9px 12px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.15);border-radius:8px;font-size:13px;color:#fff;font-family:Inter,sans-serif;outline:none">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:6px">Meta ideal mensal (Total Combinado)</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;color:rgba(255,255,255,.4)">R$</span>
+          <input type="number" id="meta-ideal-input" placeholder="150000" min="0" step="1000"
             style="flex:1;padding:9px 12px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.15);border-radius:8px;font-size:13px;color:#fff;font-family:Inter,sans-serif;outline:none">
         </div>
       </div>
@@ -876,7 +884,7 @@ footer{text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:rgba(255,255
         <div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:6px">Meta trimestral (Total Combinado)</div>
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:13px;color:rgba(255,255,255,.4)">R$</span>
-          <input type="number" id="meta-trimestral-input" placeholder="300000" min="0" step="1000"
+          <input type="number" id="meta-trimestral-input" placeholder="375000" min="0" step="1000"
             style="flex:1;padding:9px 12px;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.15);border-radius:8px;font-size:13px;color:#fff;font-family:Inter,sans-serif;outline:none">
         </div>
       </div>
@@ -1128,6 +1136,11 @@ var STATUS_REUNIAO = STATUS_REUNIAO_PROPOSTA; // alias nao usado
 var STATUS_LEAD = ['Novo Lead','Contato Feito','Respondeu','Inicial Agendada','Inicial No-Show','Telefone Invalido','Nao e Provedor','Declinou','Cortesia','Em negociacao','Nao convertido','Negociacao','Vendido'];
 var QUALIFICACOES  = ['Qualificado+','Qualificado','Desqualificado','Nao e provedor'];
 var CONTRATO_ST    = ['Sem contrato','Nao assinado','Ag assinatura','Em revisao','Assinado'];
+
+// Metas do closer (Q4 2026): meta R$ 125 mil / meta ideal R$ 150 mil por mes.
+// Nao confundir com PARAMS.totalMin (R$ 70 mil) e PARAMS.totalIdeal (R$ 140 mil), que sao os gatilhos da comissao.
+var META_PADRAO       = 125000;
+var META_IDEAL_PADRAO = 150000;
 
 var PARAMS = {
   totalMin:70000, totalIdeal:140000, mrrMin:20000, mrrIdeal:40000,
@@ -1943,79 +1956,64 @@ function recalc(){
   var leadsPagos      = leads.filter(function(l){return l.status==='Vendido' && l.pago==='Pago';});
   var qtdMrrVend  = leadsVendidos.filter(function(l){return l.mrrServ>0||l.mrrBi>0;}).length;
   var qtdMrrPago  = leadsPagos.filter(function(l){return l.mrrServ>0||l.mrrBi>0;}).length;
-  // Campanha 1 — acumulado Q3 progressivo
+  // Campanha 1 — recorrencias acumuladas no trimestre (meta 15 = R$ 15.000)
   // Usa cache se disponivel, senao usa logica local do mes
   var MESES_PT_C = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var maC = getMesAno();
   var mesIdxC = MESES_PT_C.indexOf(maC.mes);
-  var acumC    = _campanhaCache ? _campanhaCache.acumAteMes : qtdMrrVend;
-  var acumTriC = _campanhaCache ? _campanhaCache.acumSet : qtdMrrVend;
-  var metaAcumC = Math.min(18, (Math.min(3, Math.floor(acumC/6)) + 1) * 6);
-  var c1bonus   = _campanhaCache ? _campanhaCache.bonusCampanhaMes : (acumC >= 6 ? 2000 : 0);
-  var c1atingida = c1bonus > 0;
-  // Bonus trimestral Q3: +R$ 5.000 se o acumulado do tri chegar a 18 (entra na comissao de setembro)
-  var triAtingidaProj = (mesIdxC === 8 && _campanhaCache && _campanhaCache.metaTriAtingida);
-  var triBonusProj    = triAtingidaProj ? 5000 : 0;
+  var qtdBiMes  = leadsVendidos.filter(function(l){return l.mrrBi>0;}).length;
+  var metaAcumC = _campanhaCache ? _campanhaCache.metaRec : 15;   // 15 recorrencias no trimestre
+  var metaBiC   = _campanhaCache ? _campanhaCache.metaBi  : 9;    // 9 Power BI no trimestre
+  var acumC     = _campanhaCache ? _campanhaCache.acumRecAteMes : qtdMrrVend;   // recorrencias acumuladas no tri
+  var acumBiC   = _campanhaCache ? _campanhaCache.acumBiAteMes  : qtdBiMes;     // BIs acumulados no tri
+  var c1bonus   = _campanhaCache ? _campanhaCache.bonusRecDoMes : 0;  // R$ 15.000 no mes em que bateu as 15
+  var c1atingida = _campanhaCache ? (_campanhaCache.acumRecAteMes >= metaAcumC) : false;
+  // Bonus Power BI: R$ 5.000 ao atingir 9 BIs no trimestre
+  var biBonusProj  = _campanhaCache ? _campanhaCache.bonusBiDoMes : 0;
+  var biAtingidaProj = _campanhaCache ? (_campanhaCache.acumBiAteMes >= metaBiC) : false;
 
-  // Campanha 2: 80k total -> BI vira fixo 500/BI, 4+ BIs -> 700/BI
-  // O valor do BI ja entra em calcComissao via comBi = qtdBi * valorBI
-  // c2bonus = 0 para nao duplicar — o bonus esta embutido na comissao do canal
+  // O MRR de BI passou a comissionar pela porcentagem do proprio canal do lead,
+  // igual ao MRR de servico. Nao existe mais valor fixo por BI nem gatilho de R$ 80.000.
   var totalGerado = m.totalCombinado;
-  var c2ativa     = totalGerado >= 80000;
   var qtdBiVend   = leadsVendidos.filter(function(l){return l.mrrBi>0;}).length;
   var qtdBiPago   = leadsPagos.filter(function(l){return l.mrrBi>0;}).length;
-  var valorPorBi  = c2ativa ? (qtdBiVend>=4 ? 700 : 500) : 0;
-  var c2bonus     = 0; // ja contabilizado dentro de calcComissao
-  var c2bonusPago = 0; // ja contabilizado dentro de calcComissao
-  var c2bonusDisplay = c2ativa ? qtdBiVend * valorPorBi : 0; // so para exibicao
 
   // Render campanhas
   var cw = document.getElementById('campanhas-wrap');
   if(cw){
     // Campanha 1
     var c1cls = c1atingida ? 'atingida' : 'ativa';
-    var c1badge = c1atingida ? '<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(c1bonus)+'</span>' : '<span class="campanha-badge camp-pend">'+acumC+'/'+metaAcumC+' acumulado</span>';
+    var c1badge = c1atingida ? '<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(15000)+'</span>' : '<span class="campanha-badge camp-pend">'+acumC+'/'+metaAcumC+' no tri</span>';
     var c1p = Math.min((acumC/metaAcumC)*100,100);
-    // Campanha 2
-    var c2cls = !c2ativa ? 'bloqueada' : (qtdBiVend>=4?'atingida':'ativa');
-    var c2badge = !c2ativa
-      ? '<span class="campanha-badge camp-block">Bloqueada — faltam '+fmt(80000-totalGerado)+'</span>'
-      : (qtdBiVend>=4 ? '<span class="campanha-badge camp-hit">700/BI ativo ('+qtdBiVend+' BIs)</span>' : '<span class="campanha-badge camp-pend">500/BI ativo — '+qtdBiVend+'/4 para 700</span>');
-    var c2p = Math.min((totalGerado/80000)*100,100);
     cw.innerHTML=
       '<div class="campanha-card '+c1cls+'">'
         +'<div class="campanha-header"><span class="campanha-nome">Campanha 1 — Bonus de recorrencia</span>'+c1badge+'</div>'
-        +'<div class="campanha-desc">'+acumC+' recorrencias acumuladas no tri · a cada 6 acumuladas o mes ganha R$ 2.000</div>'
+        +'<div class="campanha-desc">'+metaAcumC+' recorrencias acumuladas no trimestre = bonus de R$ 15.000</div>'
         +'<div class="campanha-progress">'
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>Acumulado: '+acumC+' recorrencias</span><span>meta: '+metaAcumC+'</span></div>'
           +'<div class="progress-bar"><div class="progress-fill'+(c1atingida?' green':'')+'" style="width:'+c1p+'%"></div></div>'
         +'</div>'
-        +'<div class="campanha-val">'+(c1atingida?'+ '+fmt(c1bonus)+' (vendidos)':'acumulado: '+acumC+'/'+metaAcumC)+'</div>'
-        +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">Pagos acumulados: '+acumPagoR+'/'+metaAcumPagoR+(c1bonusReal>0?' ✓ +R$2.000 confirmado':'')+'</div>'
+        +'<div class="campanha-val">'+(c1atingida?'+ '+fmt(15000)+' (vendidos)':'acumulado: '+acumC+'/'+metaAcumC)+'</div>'
+        +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">Pagos acumulados: '+acumPagoR+'/'+metaAcumPagoR+(acumPagoR>=metaAcumPagoR?' ✓ confirmado':'')+'</div>'
       +'</div>'
-      +'<div class="campanha-card '+c2cls+'">'
-        +'<div class="campanha-header"><span class="campanha-nome">Campanha 2 — Comissao especial BI</span>'+c2badge+'</div>'
-        +'<div class="campanha-desc">Gatilho: R$ 80.000 em receita total. Ativado: R$ 500/BI vendido. Com 4+ BIs: R$ 700/BI (substitui % normal do canal).</div>'
+      ;
+    // Campanha 3 — Bonus Power BI do trimestre
+    var c3ok = biAtingidaProj;
+    cw.innerHTML +=
+      '<div class="campanha-card '+(c3ok?'atingida':'ativa')+'">'
+        +'<div class="campanha-header"><span class="campanha-nome">Campanha 3 — Bonus Power BI</span>'
+        +(c3ok?'<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(5000)+'</span>':'<span class="campanha-badge camp-pend">'+acumBiC+'/'+metaBiC+' no tri</span>')+'</div>'
+        +'<div class="campanha-desc">'+metaBiC+' Power BI vendidos no trimestre = bonus de R$ 5.000</div>'
         +'<div class="campanha-progress">'
-          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>'+fmt(totalGerado)+' gerados</span><span>gatilho: '+fmt(80000)+'</span></div>'
-          +'<div class="progress-bar"><div class="progress-fill'+(c2ativa?' green':'')+'" style="width:'+c2p+'%"></div></div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.35);margin-bottom:4px"><span>Acumulado: '+acumBiC+' BIs</span><span>meta: '+metaBiC+'</span></div>'
+          +'<div class="progress-bar"><div class="progress-fill'+(c3ok?' green':'')+'" style="width:'+Math.min((acumBiC/metaBiC)*100,100)+'%"></div></div>'
         +'</div>'
-        +'<div class="campanha-val">'+(c2ativa?'R$ '+valorPorBi+'/BI x '+qtdBiVend+' = '+ fmt(c2bonusDisplay):'faltam '+fmt(Math.max(80000-totalGerado,0)))+'</div>'
+        +'<div class="campanha-val">'+(c3ok?'+ '+fmt(5000)+' (vendidos)':'faltam '+Math.max(0,metaBiC-acumBiC)+' BIs')+'</div>'
+        +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">Pagos acumulados: '+acumBiPagoR+'/'+metaBiC+(acumBiPagoR>=metaBiC?' ✓ confirmado':'')+'</div>'
       +'</div>';
-    if(mesIdxC >= 6 && mesIdxC <= 8){
-      var accTri = _campanhaCache ? _campanhaCache.acumSet : acumTriC;
-      var triOk  = _campanhaCache ? _campanhaCache.metaTriAtingida : false;
-      var metaTriShow = 18;
-      cw.innerHTML +=
-        '<div class="campanha-card '+(triOk?'atingida':'ativa')+'">'
-          +'<div class="campanha-header"><span class="campanha-nome">Campanha 3 — Bonus trimestral de recorrencia</span>'
-          +(triOk?'<span class="campanha-badge camp-hit">ATINGIDA +'+fmt(5000)+'</span>':'<span class="campanha-badge camp-pend">'+accTri+'/'+metaTriShow+' no tri</span>')+'</div>'
-          +'<div class="campanha-desc">'+metaTriShow+' recorrencias acumuladas no Q3 = bonus de R$ 5.000, pago na comissao de setembro</div>'
-        +'</div>';
-    }
   }
 
-  function calcComissao(filtroLeads, nivelParam, c2ativo, valorBI){
+  function calcComissao(filtroLeads, nivelParam){
     var totC=0;
     var comH='<tr><th>Canal</th><th>MRR Serv</th><th>MRR BI</th><th>% MRR Serv</th><th>Comissao BI</th><th>Produto</th><th>% Prod</th><th>Proj.Pers.</th><th>% Proj</th><th>Total</th></tr>';
     var comR=CANAIS.map(function(c){
@@ -2050,7 +2048,7 @@ function recalc(){
       var proj = cLeads.reduce(function(s,l){ return s+(l.projetoPersonalizado||0); }, 0);
       var comProj = proj * pJ;
 
-      var comBi=c2ativo?(qtdBi*valorBI):(mrrBi*pM);
+      var comBi = mrrBi * pM;   // BI comissiona pela % do canal do lead
       var tot=comServ+comBi+comProd+comProj;
       totC+=tot;
 
@@ -2071,12 +2069,12 @@ function recalc(){
       // Taxa exibida Proj Pers
       var taxaProjExib = proj&&pJ ? (pJ*100).toFixed(1)+'%' : (proj?'--':'--');
 
-      var biCell=c2ativo?(qtdBi>0?qtdBi+'x '+fmt(valorBI):'--'):(mrrBi?(pM*100).toFixed(1)+'%':'--');
+      var biCell = mrrBi ? (pM*100).toFixed(1)+'%' : '--';
       return '<tr><td>'+c+'</td>'
         +'<td>'+(mrrServ?fmt(mrrServ):'--')+'</td>'
         +'<td>'+(mrrBi?fmt(mrrBi):'--')+'</td>'
         +'<td>'+(mrrServ?taxaExib:'--')+'</td>'
-        +'<td class="'+(c2ativo&&qtdBi>0?'grn':'')+'">'+(mrrBi?biCell:'--')+'</td>'
+        +'<td>'+(mrrBi?biCell:'--')+'</td>'
         +'<td>'+(prod?fmt(prod):'--')+'</td>'
         +'<td>'+(prod?taxaProdExib:'--')+'</td>'
         +'<td>'+(proj?fmt(proj):'--')+'</td>'
@@ -2095,8 +2093,8 @@ function recalc(){
   // nivel para REAL: baseado no total pago (gatilho 70k)
   var nivel = gatilhoAtingido ? (totalPago >= PARAMS.totalIdeal ? 'ideal' : 'min') : 'abaixo';
 
-  var resProj = calcComissao(leadsVendidos, nivelProj, c2ativa, valorPorBi);
-  var resReal = calcComissao(leadsPagos,    nivel,     c2ativa, valorPorBi);
+  var resProj = calcComissao(leadsVendidos, nivelProj);
+  var resReal = calcComissao(leadsPagos,    nivel);
 
   var tpj = document.getElementById('comissao-table-proj');
   var trl = document.getElementById('comissao-table-real');
@@ -2107,15 +2105,16 @@ function recalc(){
 
   // Projecao: sem gatilho — mostra sempre (e apenas projecao)
   // Real: so mostra se 70k pago atingido
-  var bonusProjTotal = c1bonus + c2bonus + triBonusProj;
-  // Bonus real da campanha 1 — usa acumulado de pagos do Q3
+  var bonusProjTotal = c1bonus + biBonusProj;
+  // Bonus real da campanha 1 — usa acumulado de pagos do trimestre
   var MESES_PT_R = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var mesIdxR = MESES_PT_R.indexOf(getMesAno().mes);
-  var acumPagoR = _campanhaCache ? _campanhaCache.acumPagoAteMes : qtdMrrPago;
-  var metaAcumPagoR = Math.min(18, (Math.min(3, Math.floor(acumPagoR/6)) + 1) * 6);
-  var c1bonusReal = _campanhaCache ? _campanhaCache.bonusCampanhaMesPago : (acumPagoR >= 6 ? 2000 : 0);
-  var triBonusReal = (mesIdxR === 8 && _campanhaCache && _campanhaCache.bonusTriPago > 0) ? 5000 : 0;
-  var bonusRealTotal = gatilhoAtingido ? (c1bonusReal + c2bonusPago + triBonusReal) : 0;
+  var acumPagoR     = _campanhaCache ? _campanhaCache.acumRecPagoAteMes : qtdMrrPago;
+  var acumBiPagoR   = _campanhaCache ? _campanhaCache.acumBiPagoAteMes : 0;
+  var metaAcumPagoR = metaAcumC;
+  var c1bonusReal   = _campanhaCache ? _campanhaCache.bonusRecDoMesPago : 0;
+  var biBonusReal   = _campanhaCache ? _campanhaCache.bonusBiDoMesPago : 0;
+  var bonusRealTotal = gatilhoAtingido ? (c1bonusReal + biBonusReal) : 0;
 
   // Bonus qualitativos — sempre mostrar (projeção), bloqueado só no real
   var br=document.getElementById('bonus-rows'); var totB=0;
@@ -2159,17 +2158,15 @@ function recalc(){
     metCard.style.display='block';
     calcularCampanhaAcumulada().then(function(cache){
       if(!cache||!metCamp) return;
-      var rows=[
-        {mes:'Julho',    rec:cache.recJul, acum:cache.acumJul, meta:6,  bonus:cache.bonusJul},
-        {mes:'Agosto',   rec:cache.recAgo, acum:cache.acumAgo, meta:12, bonus:cache.bonusAgo},
-        {mes:'Setembro', rec:cache.recSet, acum:cache.acumSet, meta:18, bonus:cache.bonusSet},
-      ];
+      var rows=cache.meses.map(function(nome,i){
+        return {mes:nome, rec:cache.recMes[i], acum:cache.acumRec[i], bi:cache.biMes[i], acumBi:cache.acumBi[i], bonus:cache.bonusRecMes[i]+cache.bonusBiMes[i]};
+      });
       metCamp.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px">'
         +'<thead><tr style="color:rgba(255,255,255,.4);font-size:11px;text-transform:uppercase;letter-spacing:.06em">'
         +'<th style="padding:6px 0;text-align:left">Mês</th>'
         +'<th style="padding:6px 8px;text-align:center">Rec. no mês</th>'
-        +'<th style="padding:6px 8px;text-align:center">Acumulado</th>'
-        +'<th style="padding:6px 8px;text-align:center">Meta</th>'
+        +'<th style="padding:6px 8px;text-align:center">Acum. rec.</th>'
+        +'<th style="padding:6px 8px;text-align:center">Power BI (acum.)</th>'
         +'<th style="padding:6px 8px;text-align:right">Bônus</th>'
         +'</tr></thead><tbody>'
         +rows.map(function(r){
@@ -2177,20 +2174,20 @@ function recalc(){
           return '<tr style="border-top:.5px solid rgba(255,255,255,.06)">'
             +'<td style="padding:8px 0;color:#fff;font-weight:500">'+r.mes+'</td>'
             +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.7)">'+r.rec+'</td>'
-            +'<td style="padding:8px;text-align:center;color:'+cor+';font-weight:700">'+r.acum+' / '+r.meta+'</td>'
-            +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.4)">&ge; '+r.meta+' acum.</td>'
+            +'<td style="padding:8px;text-align:center;color:'+cor+';font-weight:700">'+r.acum+' / '+cache.metaRec+'</td>'
+            +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.6)">'+r.bi+' ('+r.acumBi+' / '+cache.metaBi+')</td>'
             +'<td style="padding:8px;text-align:right;font-weight:700;color:'+(r.bonus>0?'#1baf7a':'rgba(255,255,255,.25)')+'">'+(r.bonus>0?'+ R$ '+r.bonus.toLocaleString('pt-BR'):'—')+'</td>'
           +'</tr>';
         }).join('')
         +'<tr style="border-top:.5px solid rgba(255,255,255,.15)">'
-          +'<td style="padding:8px 0;color:#fff;font-weight:600">Trimestre</td>'
-          +'<td colspan="2" style="padding:8px;text-align:center;color:'+(cache.bonusTri>0?'#1baf7a':'rgba(255,255,255,.7)')+';font-weight:700">'+cache.acumSet+' / 18</td>'
-          +'<td style="padding:8px;text-align:center;color:rgba(255,255,255,.4)">≥ 18 no tri</td>'
-          +'<td style="padding:8px;text-align:right;font-weight:700;color:'+(cache.bonusTri>0?'#1baf7a':'rgba(255,255,255,.25)')+'">'+(cache.bonusTri>0?'+ R$ 5.000':'—')+'</td>'
+          +'<td style="padding:8px 0;color:#fff;font-weight:600">'+cache.tri+'</td>'
+          +'<td colspan="2" style="padding:8px;text-align:center;color:'+(cache.recAtingida?'#1baf7a':'rgba(255,255,255,.7)')+';font-weight:700">'+cache.acumRec[2]+' / '+cache.metaRec+' rec.</td>'
+          +'<td style="padding:8px;text-align:center;color:'+(cache.biAtingida?'#1baf7a':'rgba(255,255,255,.7)')+';font-weight:700">'+cache.acumBi[2]+' / '+cache.metaBi+' BI</td>'
+          +'<td style="padding:8px;text-align:right;font-weight:700;color:'+(cache.totalBonus>0?'#1baf7a':'rgba(255,255,255,.25)')+'">'+(cache.totalBonus>0?'+ R$ '+cache.totalBonus.toLocaleString('pt-BR'):'—')+'</td>'
         +'</tr>'
         +'</tbody></table>'
         +'<div style="margin-top:14px;padding:10px 14px;background:rgba(255,107,0,.08);border:.5px solid rgba(255,107,0,.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center">'
-          +'<span style="font-size:12px;color:rgba(255,255,255,.5)">Total de bônus Q3 ganho</span>'
+          +'<span style="font-size:12px;color:rgba(255,255,255,.5)">Total de bônus no trimestre</span>'
           +'<span style="font-size:18px;font-weight:800;color:'+(cache.totalBonus>0?'#1baf7a':'rgba(255,255,255,.3)')+'">R$ '+cache.totalBonus.toLocaleString('pt-BR')+'</span>'
         +'</div>';
     });
@@ -3800,7 +3797,11 @@ function _homePct(val,meta){ return meta>0?Math.min(100,Math.round(val/meta*100)
 function _homePctReal(val,meta){ return meta>0?Math.round(val/meta*100):0; }
 function _barColor(pct){ return pct>=100?'#1baf7a':pct>=70?'#ff9940':'#ff6b00'; }
 
-function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
+function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo, metaIdeal){
+  metaIdeal = metaIdeal || Math.round(meta * (META_IDEAL_PADRAO/META_PADRAO));
+  var pctIdeal = _homePctReal(totalComb, metaIdeal);
+  var pctIdealBar = _homePct(totalComb, metaIdeal);
+  var faltaIdeal = Math.max(0, metaIdeal - totalComb);
   var pctVend    = _homePctReal(totalComb, meta);  // real sem limite
   var pctVendBar = _homePct(totalComb, meta);       // para barra (max 100)
   var pctPago    = _homePctReal(totalPago, meta);
@@ -3816,10 +3817,11 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     '<div style="background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.1);border-radius:16px;padding:1.6rem 1.8rem">'
     +'<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.1em">Meta '+labelPeriodo+'</div>'
     +'<div style="font-size:36px;font-weight:800;color:#fff;line-height:1;margin:6px 0">'+_homeF(meta)+'</div>'
-    +'<div style="font-size:12px;color:rgba(255,255,255,.35)">Referência do período</div>'
+    +'<div style="font-size:12px;color:rgba(255,255,255,.35)">Meta ideal: '+_homeF(metaIdeal)+'</div>'
     +'<div style="margin-top:12px;background:rgba(255,255,255,.06);border-radius:8px;height:6px;overflow:hidden">'
       +'<div style="height:6px;border-radius:8px;width:'+pctVendBar+'%;background:'+corVend+'"></div>'
     +'</div>'
+    +'<div style="margin-top:6px;display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.3)"><span>meta '+_homeF(meta)+'</span><span style="color:'+(pctIdealBar>=100?'#1baf7a':'rgba(255,255,255,.3)')+'">ideal: '+pctIdeal+'%</span></div>'
     +'</div>'
 
     +'<div style="background:rgba(255,107,0,.06);border:.5px solid rgba(255,107,0,.2);border-radius:16px;padding:1.6rem 1.8rem">'
@@ -3847,9 +3849,11 @@ function _renderHomeCards(totalComb, totalPago, meta, labelPeriodo){
     +'<div style="margin-top:8px;background:rgba(255,255,255,.06);border-radius:6px;height:5px;overflow:hidden"><div style="height:5px;border-radius:6px;width:'+pctPago+'%;background:#1baf7a"></div></div>'
     +'</div>'
     +'<div class="hmc-extra-card">'
-    +'<div class="hec-lbl">Falta para meta</div>'
-    +'<div class="hec-val" style="color:'+(faltaMeta===0?'#1baf7a':'#e34948')+'">'+_homeF(faltaMeta)+'</div>'
-    +'<div class="hec-sub">'+(faltaMeta===0?'🎉 Meta atingida!':pctVend+'% concluído')+'</div>'
+    +'<div class="hec-lbl">'+(faltaMeta===0?'Falta para a meta ideal':'Falta para meta')+'</div>'
+    +'<div class="hec-val" style="color:'+(faltaMeta===0?(faltaIdeal===0?'#1baf7a':'#ff9940'):'#e34948')+'">'+_homeF(faltaMeta===0?faltaIdeal:faltaMeta)+'</div>'
+    +'<div class="hec-sub">'+(faltaMeta===0
+        ? (faltaIdeal===0?'🏆 Meta ideal atingida!':'🎉 Meta batida · '+pctIdeal+'% da ideal')
+        : pctVend+'% concluído')+'</div>'
     +'</div>';
 
   document.getElementById('home-loading').style.display='none';
@@ -3888,15 +3892,20 @@ async function carregarHome(){
 
   var fb = window._fb;
   var emailKey = emailKeyAtivo();
-  var metaMensal = 100000, metaTrimestral = 300000;
+  var metaMensal = META_PADRAO, metaTrimestral = META_PADRAO*3;
+  var metaIdeal = META_IDEAL_PADRAO, metaIdealTri = META_IDEAL_PADRAO*3;
 
   // Buscar metas (nao bloquear se falhar)
   try {
     var snapMeta = await fb.getDoc(fb.doc(fb.db,'usuarios',emailKey));
     if(snapMeta.exists()){
       var d = snapMeta.data();
-      metaMensal     = d.metaMensal     || 100000;
-      metaTrimestral = d.metaTrimestral || 300000;
+      metaMensal     = d.metaMensal     || META_PADRAO;
+      metaTrimestral = d.metaTrimestral || META_PADRAO*3;
+      metaIdeal      = d.metaIdeal      || META_IDEAL_PADRAO;
+      metaIdealTri   = d.metaIdealTri   || META_IDEAL_PADRAO*3;
+      var inpI = document.getElementById('meta-ideal-input');
+      if(inpI && !inpI.value) inpI.value = metaIdeal;
       var inpM = document.getElementById('meta-mensal-input');
       var inpT = document.getElementById('meta-trimestral-input');
       if(inpM && !inpM.value) inpM.value = metaMensal;
@@ -3940,7 +3949,7 @@ async function carregarHome(){
 
       var metaProporcional = metaMensal * mesesSel.length;
       var labelMeta = mesesSel.length > 1 ? 'acumulado ('+mesesSel.length+' meses)' : 'mensal';
-      _renderHomeCards(totalComb, totalPago, metaProporcional, labelMeta);
+      _renderHomeCards(totalComb, totalPago, metaProporcional, labelMeta, metaIdeal * mesesSel.length);
       calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
 
     } else {
@@ -3971,13 +3980,13 @@ async function carregarHome(){
         } catch(eT){ console.warn('home tri err:', mesesTri[i], eT); }
       }
 
-      _renderHomeCards(totalComb, totalPago, metaTrimestral, 'trimestral');
+      _renderHomeCards(totalComb, totalPago, metaTrimestral, 'trimestral', metaIdealTri);
       calcularCampanhaAcumulada().then(function(cache){ renderCampanhaAcumuladaHome(cache); });
     }
   } catch(eGlobal){
     console.error('carregarHome erro:', eGlobal);
     // Mesmo com erro, esconder loading e mostrar o que tiver
-    _renderHomeCards(0, 0, metaMensal, 'mensal');
+    _renderHomeCards(0, 0, metaMensal, 'mensal', metaIdeal);
   }
 
   if(isAdmin && _homeUserView==='time'){
@@ -4112,13 +4121,15 @@ async function carregarHomeTime(){
 
 async function salvarMinhasMetas(){
   if(!currentUser || !window._fb) return;
-  var metaMensal     = parseFloat(document.getElementById('meta-mensal-input').value) || 100000;
-  var metaTrimestral = parseFloat(document.getElementById('meta-trimestral-input').value) || 300000;
+  var metaMensal     = parseFloat(document.getElementById('meta-mensal-input').value) || META_PADRAO;
+  var metaTrimestral = parseFloat(document.getElementById('meta-trimestral-input').value) || META_PADRAO*3;
+  var elIdeal        = document.getElementById('meta-ideal-input');
+  var metaIdeal      = (elIdeal && parseFloat(elIdeal.value)) || META_IDEAL_PADRAO;
   var fb2 = document.getElementById('meta-feedback');
   try {
     var fb = window._fb;
     var emailKey = currentUser.email.replace(/[^a-zA-Z0-9]/g,'_');
-    await fb.setDoc(fb.doc(fb.db,'usuarios',emailKey),{metaMensal:metaMensal,metaTrimestral:metaTrimestral},{merge:true});
+    await fb.setDoc(fb.doc(fb.db,'usuarios',emailKey),{metaMensal:metaMensal,metaTrimestral:metaTrimestral,metaIdeal:metaIdeal,metaIdealTri:metaIdeal*3},{merge:true});
     fb2.style.display='block';fb2.style.color='#1baf7a';
     fb2.textContent='Metas salvas com sucesso!';
     setTimeout(function(){fb2.style.display='none';},3000);
@@ -4362,116 +4373,88 @@ function alterarStatusServico(cnpj, si, novoStatus){
 
 
 // ==================== CAMPANHA ACUMULADA Q3 ====================
-// Trimestre fixo Q3: Julho, Agosto, Setembro
-// Regra: a cada mês, bonus de R$2.000 se acumulado >= mesesPassados * 6
-// Ex: Ago -> acumulado Jul+Ago >= 12 -> ganhou; Set -> acumulado >= 18 -> ganhou
+// Trimestre detectado pelo mes selecionado (Q1..Q4)
+// Regra atual: 15 recorrencias no trimestre = R$ 15.000 | 9 Power BI no trimestre = R$ 5.000
 
-var _campanhaCache = null; // { recJul, recAgo, recSet, acumAteJul, acumAteAgo, acumAteSet, bonusJul, bonusAgo, bonusSet, totalBonus, mesAtual }
+var _campanhaCache = null; // { tri, meses, recMes[], acumRec[], biMes[], acumBi[], bonusRecMes[], bonusBiMes[], totalBonus, ... }
 
 async function calcularCampanhaAcumulada(){
   if(!currentUser || !window._fb) return null;
   var fb = window._fb;
   var emailKey = emailKeyAtivo();
   window._campanhaCacheEmail = emailAtivo();
-  var ano = '2026';
-  var mesesQ3 = ['Julho','Agosto','Setembro'];
 
-  // Contar recorrencias (MRR>0) vendidas (status Vendido) por mes
-  var mesesComDados  = {Julho:false, Agosto:false, Setembro:false};
-  var recPorMes      = {Julho:0, Agosto:0, Setembro:0};
-  var recPagosPorMes = {Julho:0, Agosto:0, Setembro:0};
+  var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var ma = getMesAno();
+  var ano = String(ma.ano);
+  var mesIdx = MESES_PT.indexOf(ma.mes);
+  if(mesIdx < 0) mesIdx = 0;
+  var triIdx = Math.floor(mesIdx/3);                 // 0=Q1 ... 3=Q4
+  var mesesTri = MESES_PT.slice(triIdx*3, triIdx*3+3);
+  var posNoTri = mesIdx - triIdx*3;                  // 0,1,2
+  var nomeTri = 'Q'+(triIdx+1);
 
-  for(var i=0; i<mesesQ3.length; i++){
-    var chave = emailKey+'__'+mesesQ3[i]+'_'+ano;
+  // METAS DA CAMPANHA (Q4 2026): 15 recorrencias no tri = R$ 15.000 | 9 Power BI no tri = R$ 5.000
+  var META_REC = 15, BONUS_REC = 15000;
+  var META_BI  = 9,  BONUS_BI  = 5000;
+
+  var recMes = [0,0,0], biMes = [0,0,0];
+  var recMesPago = [0,0,0], biMesPago = [0,0,0];
+
+  for(var i=0;i<3;i++){
+    var chave = emailKey+'__'+mesesTri[i]+'_'+ano;
     try {
       var snap = await fb.getDoc(fb.doc(fb.db,'leads',chave));
       if(snap.exists() && snap.data().leads){
-        if(snap.data().leads.length > 0) mesesComDados[mesesQ3[i]] = true;
-        snap.data().leads.forEach(function(l){
-          if(l.status==='Vendido' && ((l.mrrServ||0)>0 || (l.mrrBi||0)>0)){
-            recPorMes[mesesQ3[i]]++;
-            if(l.pago==='Pago') recPagosPorMes[mesesQ3[i]]++;
-          }
-        });
+        (function(idx){
+          snap.data().leads.forEach(function(l){
+            if(l.status!=='Vendido') return;
+            var pago = l.pago==='Pago';
+            if((l.mrrServ||0)>0 || (l.mrrBi||0)>0){ recMes[idx]++; if(pago) recMesPago[idx]++; }
+            if((l.mrrBi||0)>0){ biMes[idx]++; if(pago) biMesPago[idx]++; }
+          });
+        })(i);
       }
     } catch(e){ /* mes sem dados */ }
   }
 
-  // Acumulado progressivo e bonus por mes
-  var acumJul = recPorMes['Julho'];
-  var acumAgo = acumJul + recPorMes['Agosto'];
-  var acumSet = acumAgo + recPorMes['Setembro'];
+  function acumular(arr){ var out=[],t=0; for(var i=0;i<3;i++){ t+=arr[i]; out.push(t); } return out; }
+  var acumRec = acumular(recMes),      acumBi = acumular(biMes);
+  var acumRecPago = acumular(recMesPago), acumBiPago = acumular(biMesPago);
 
-  // Bonus mensal ACUMULADO no trimestre — um mes compensa o outro.
-  // A meta so comeca a contar no 1o mes em que o closer tem leads lancados.
-  // Cada 6 recorrencias ACUMULADAS no trimestre = R$ 2.000, ate 3 blocos (R$ 6.000).
-  // Nao importa o mes: 12 em julho ja garante o bonus de julho e agosto.
-  function blocos(acum){ return Math.min(3, Math.floor(acum / 6)); }
-  var blocosJul = blocos(acumJul), blocosAgo = blocos(acumAgo), blocosSet = blocos(acumSet);
-  // Maximo de R$ 2.000 por mes: ganha no mes em que o acumulado cruza um novo bloco de 6.
-  var bonusJul = blocosJul > 0 ? 2000 : 0;
-  var bonusAgo = blocosAgo > blocosJul ? 2000 : 0;
-  var bonusSet = blocosSet > blocosAgo ? 2000 : 0;
-  // Bonus trimestral: R$ 5.000 se o acumulado do trimestre chegar a 18 ou mais (sem minimo por mes)
-  // Bonus trimestral: SEMPRE 18 recorrencias no Q3, independente de quando o closer entrou
-  var metaTri = 18;
-  var metaTriAtingida = acumSet >= metaTri;
-  var bonusTri = metaTriAtingida ? 5000 : 0;
-  var totalBonus = bonusJul + bonusAgo + bonusSet + bonusTri;
+  // O bonus e creditado no mes em que a meta do trimestre e alcancada
+  function bonusPorMes(acum, meta, valor){
+    return [0,1,2].map(function(i){
+      return (acum[i] >= meta && (i===0 || acum[i-1] < meta)) ? valor : 0;
+    });
+  }
+  var bonusRecMes = bonusPorMes(acumRec, META_REC, BONUS_REC);
+  var bonusBiMes  = bonusPorMes(acumBi,  META_BI,  BONUS_BI);
+  var bonusRecMesPago = bonusPorMes(acumRecPago, META_REC, BONUS_REC);
+  var bonusBiMesPago  = bonusPorMes(acumBiPago,  META_BI,  BONUS_BI);
 
-  // Acumulado de PAGOS (para comissao confirmada)
-  var acumPagoJul = recPagosPorMes['Julho'];
-  var acumPagoAgo = acumPagoJul + recPagosPorMes['Agosto'];
-  var acumPagoSet = acumPagoAgo + recPagosPorMes['Setembro'];
-
-  var blocosPagoJul = blocos(acumPagoJul), blocosPagoAgo = blocos(acumPagoAgo), blocosPagoSet = blocos(acumPagoSet);
-  var bonusPagoJul = blocosPagoJul > 0 ? 2000 : 0;
-  var bonusPagoAgo = blocosPagoAgo > blocosPagoJul ? 2000 : 0;
-  var bonusPagoSet = blocosPagoSet > blocosPagoAgo ? 2000 : 0;
-  var bonusTriPago = acumPagoSet >= metaTri ? 5000 : 0;
-  var totalBonusPago = bonusPagoJul + bonusPagoAgo + bonusPagoSet + bonusTriPago;
-
-  // Mes atual do Q3 para saber o que ja passou
-  var MESES_PT = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  var ma = getMesAno();
-  var mesIdx = MESES_PT.indexOf(ma.mes); // 6=Jul, 7=Ago, 8=Set
+  var recAtingida = acumRec[2] >= META_REC;
+  var biAtingida  = acumBi[2]  >= META_BI;
+  var totalBonus     = (recAtingida?BONUS_REC:0) + (biAtingida?BONUS_BI:0);
+  var totalBonusPago = (acumRecPago[2]>=META_REC?BONUS_REC:0) + (acumBiPago[2]>=META_BI?BONUS_BI:0);
 
   _campanhaCache = {
-    recJul: recPorMes['Julho'],
-    recAgo: recPorMes['Agosto'],
-    recSet: recPorMes['Setembro'],
-    acumJul: acumJul,
-    acumAgo: acumAgo,
-    acumSet: acumSet,
-    bonusJul: bonusJul,
-    bonusAgo: bonusAgo,
-    bonusSet: bonusSet,
+    tri: nomeTri, ano: ano, meses: mesesTri, mesAtualIdx: mesIdx, posNoTri: posNoTri,
+    metaRec: META_REC, bonusRecValor: BONUS_REC, metaBi: META_BI, bonusBiValor: BONUS_BI,
+    // vendidos
+    recMes: recMes, acumRec: acumRec, bonusRecMes: bonusRecMes,
+    biMes: biMes, acumBi: acumBi, bonusBiMes: bonusBiMes,
+    recAtingida: recAtingida, biAtingida: biAtingida,
+    acumRecAteMes: acumRec[posNoTri], acumBiAteMes: acumBi[posNoTri],
+    bonusRecDoMes: bonusRecMes[posNoTri], bonusBiDoMes: bonusBiMes[posNoTri],
+    bonusAteMesAtual: bonusRecMes.slice(0,posNoTri+1).concat(bonusBiMes.slice(0,posNoTri+1)).reduce(function(a,b){return a+b;},0),
     totalBonus: totalBonus,
-    bonusTri: bonusTri,
-    metaTriAtingida: metaTriAtingida,
-    bonusTriPago: bonusTriPago,
-    // Pagos
-    acumPagoJul: acumPagoJul,
-    acumPagoAgo: acumPagoAgo,
-    acumPagoSet: acumPagoSet,
-    bonusPagoJul: bonusPagoJul,
-    bonusPagoAgo: bonusPagoAgo,
-    bonusPagoSet: bonusPagoSet,
+    // pagos
+    recMesPago: recMesPago, acumRecPago: acumRecPago, bonusRecMesPago: bonusRecMesPago,
+    biMesPago: biMesPago, acumBiPago: acumBiPago, bonusBiMesPago: bonusBiMesPago,
+    acumRecPagoAteMes: acumRecPago[posNoTri], acumBiPagoAteMes: acumBiPago[posNoTri],
+    bonusRecDoMesPago: bonusRecMesPago[posNoTri], bonusBiDoMesPago: bonusBiMesPago[posNoTri],
     totalBonusPago: totalBonusPago,
-    mesAtualIdx: mesIdx,
-    // Acumulado ate o mes atual
-    acumAteMesAtual: mesIdx >= 8 ? acumSet : mesIdx >= 7 ? acumAgo : acumJul,
-    metaAteMesAtual: mesIdx >= 8 ? 18 : mesIdx >= 7 ? 12 : 6,
-    bonusAteMesAtual: mesIdx >= 8 ? (bonusJul+bonusAgo+bonusSet+bonusTri) : mesIdx >= 7 ? (bonusJul+bonusAgo) : bonusJul,
-    blocos: [blocosJul, blocosAgo, blocosSet],
-    metaTri: metaTri,
-    acumAteMes: mesIdx >= 8 ? acumSet : mesIdx >= 7 ? acumAgo : acumJul,
-    acumPagoAteMes: mesIdx >= 8 ? acumPagoSet : mesIdx >= 7 ? acumPagoAgo : acumPagoJul,
-    bonusCampanhaMes: mesIdx >= 8 ? bonusSet : mesIdx >= 7 ? bonusAgo : bonusJul,
-    bonusCampanhaMesPago: mesIdx >= 8 ? bonusPagoSet : mesIdx >= 7 ? bonusPagoAgo : bonusPagoJul,
-    recMesAtual: mesIdx >= 8 ? recPorMes['Setembro'] : mesIdx >= 7 ? recPorMes['Agosto'] : recPorMes['Julho'],
-    recPagoMesAtual: mesIdx >= 8 ? recPagosPorMes['Setembro'] : mesIdx >= 7 ? recPagosPorMes['Agosto'] : recPagosPorMes['Julho'],
-    bonusMesAtual: mesIdx >= 8 ? bonusSet : mesIdx >= 7 ? bonusAgo : bonusJul,
   };
   return _campanhaCache;
 }
@@ -4480,46 +4463,41 @@ function renderCampanhaAcumuladaHome(cache){
   var wrap = document.getElementById('home-campanha-wrap');
   if(!wrap || !cache) return;
 
-  var pct = Math.min(100, Math.round(cache.acumSet / 18 * 100));
-  var meses = [
-    {nome:'Julho', rec:cache.recJul, acum:cache.acumJul, meta:6, bonus:cache.bonusJul},
-    {nome:'Agosto', rec:cache.recAgo, acum:cache.acumAgo, meta:12, bonus:cache.bonusAgo},
-    {nome:'Setembro', rec:cache.recSet, acum:cache.acumSet, meta:18, bonus:cache.bonusSet},
-  ];
+  var pctRec = Math.min(100, Math.round(cache.acumRec[2] / cache.metaRec * 100));
+  var pctBi  = Math.min(100, Math.round(cache.acumBi[2]  / cache.metaBi  * 100));
 
-  var mesesHtml = meses.map(function(m){
-    var atingiu = m.bonus > 0;
-    var futuro = (m.nome==='Agosto' && cache.mesAtualIdx < 7) || (m.nome==='Setembro' && cache.mesAtualIdx < 8);
-    var cor = atingiu ? '#1baf7a' : futuro ? 'rgba(255,255,255,.2)' : '#e34948';
-    var bg  = atingiu ? 'rgba(27,175,122,.12)' : futuro ? 'rgba(255,255,255,.04)' : 'rgba(227,73,72,.08)';
-    var bdr = atingiu ? 'rgba(27,175,122,.3)' : futuro ? 'rgba(255,255,255,.08)' : 'rgba(227,73,72,.3)';
-    var icon = atingiu ? '✓' : futuro ? '—' : '✗';
-    return '<div style="flex:1;min-width:90px;background:'+bg+';border:.5px solid '+bdr+';border-radius:10px;padding:10px 12px;text-align:center">'
-      +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">'+m.nome+'</div>'
-      +'<div style="font-size:20px;font-weight:800;color:'+cor+'">'+m.rec+'</div>'
-      +'<div style="font-size:10px;color:rgba(255,255,255,.3)">acum: '+m.acum+'</div>'
-      +'<div style="font-size:11px;font-weight:700;color:'+cor+';margin-top:4px">'+icon+' '+(atingiu?'R$ 2.000':futuro?'pendente':'sem bônus')+'</div>'
+  var mesesHtml = cache.meses.map(function(nome, i){
+    var futuro = i > cache.posNoTri;
+    var cor = futuro ? 'rgba(255,255,255,.25)' : '#fff';
+    return '<div style="flex:1;min-width:90px;background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;text-align:center">'
+      +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">'+nome+'</div>'
+      +'<div style="font-size:20px;font-weight:800;color:'+cor+'">'+cache.recMes[i]+'</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.3)">acum: '+cache.acumRec[i]+'</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:4px">BI: '+cache.biMes[i]+'</div>'
     +'</div>';
   }).join('');
 
+  function linhaMeta(icone, titulo, atual, meta, valor, ok){
+    var cor = ok ? '#1baf7a' : '#ff9940';
+    return '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(255,107,0,.06);border:.5px solid '+(ok?'rgba(27,175,122,.3)':'rgba(255,107,0,.2)')+';border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<span style="font-size:12px;color:rgba(255,255,255,.6)">'+icone+' '+titulo+': <strong style="color:'+cor+'">'+atual+' / '+meta+'</strong></span>'
+      +'<span style="font-size:13px;font-weight:800;color:'+(ok?'#1baf7a':'rgba(255,255,255,.3)')+'">'+(ok?'+ R$ '+valor.toLocaleString('pt-BR'):'R$ '+valor.toLocaleString('pt-BR')+' em jogo')+'</span>'
+    +'</div>';
+  }
+
   wrap.innerHTML = '<div class="home-campanha-card">'
-    +'<div class="hcc-label"><span class="hcc-trophy">🏆</span> Campanha de Recorrências — Q3 2026</div>'
-    +'<div class="hcc-meta">Acumulado no trimestre · <strong style="color:#ff9940">cada 6 = R$ 2.000</strong> · 18 no tri = <strong style="color:#ff9940">+R$ 5.000</strong> · máx R$ 11.000</div>'
+    +'<div class="hcc-label"><span class="hcc-trophy">🏆</span> Campanha de Recorrências — '+cache.tri+' '+cache.ano+'</div>'
+    +'<div class="hcc-meta">Acumulado no trimestre · <strong style="color:#ff9940">'+cache.metaRec+' recorrências = R$ 15.000</strong> · <strong style="color:#ff9940">'+cache.metaBi+' Power BI = R$ 5.000</strong> · máx R$ 20.000</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+mesesHtml+'</div>'
-    +'<div class="hcc-bar-wrap"><div class="hcc-bar-inner'+(pct>=100?' full':'')+'" style="width:'+pct+'%"></div></div>'
+    +'<div class="hcc-bar-wrap"><div class="hcc-bar-inner'+(pctRec>=100?' full':'')+'" style="width:'+pctRec+'%"></div></div>'
     +'<div class="hcc-pct-row" style="margin-bottom:10px">'
-      +'<span style="color:'+(pct>=100?'#1baf7a':'#ff9940')+';font-weight:700">Acumulado no tri: '+cache.acumSet+' / 18 recorrências ('+pct+'%)</span>'
-      +'<span style="color:rgba(255,255,255,.4);font-weight:700">Bônus ganho: R$ '+cache.bonusAteMesAtual.toLocaleString('pt-BR')+'</span>'
+      +'<span style="color:'+(pctRec>=100?'#1baf7a':'#ff9940')+';font-weight:700">Recorrências: '+cache.acumRec[2]+' / '+cache.metaRec+' ('+pctRec+'%)</span>'
+      +'<span style="color:rgba(255,255,255,.4);font-weight:700">Power BI: '+cache.acumBi[2]+' / '+cache.metaBi+' ('+pctBi+'%)</span>'
     +'</div>'
-    +(function(){
-        var cor=cache.metaTriAtingida?'#1baf7a':'#ff9940';
-        return '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(255,107,0,.06);border:.5px solid '+(cache.metaTriAtingida?'rgba(27,175,122,.3)':'rgba(255,107,0,.2)')+';border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
-          +'<span style="font-size:12px;color:rgba(255,255,255,.6)">🎯 Bônus trimestral — 18 recorrências no tri: <strong style="color:'+cor+'">'+cache.acumSet+' / 18</strong></span>'
-          +'<span style="font-size:13px;font-weight:800;color:'+(cache.metaTriAtingida?'#1baf7a':'rgba(255,255,255,.3)')+'">'+(cache.metaTriAtingida?'+ R$ 5.000':'R$ 5.000 em jogo')+'</span>'
-        +'</div>';
-      })()
+    +linhaMeta('🎯','Bônus de recorrências', cache.acumRec[2], cache.metaRec, cache.bonusRecValor, cache.recAtingida)
+    +linhaMeta('📊','Bônus Power BI', cache.acumBi[2], cache.metaBi, cache.bonusBiValor, cache.biAtingida)
     +(cache.totalBonus>0
-      ? '<div style="padding:8px 14px;background:rgba(27,175,122,.12);border:.5px solid rgba(27,175,122,.3);border-radius:8px;font-size:12px;color:#1baf7a;font-weight:600;text-align:center">🎉 Total de bônus no Q3: R$ '+cache.totalBonus.toLocaleString('pt-BR')+' / R$ 11.000</div>'
+      ? '<div style="padding:8px 14px;background:rgba(27,175,122,.12);border:.5px solid rgba(27,175,122,.3);border-radius:8px;font-size:12px;color:#1baf7a;font-weight:600;text-align:center">🎉 Total de bônus no '+cache.tri+': R$ '+cache.totalBonus.toLocaleString('pt-BR')+' / R$ 20.000</div>'
       : '')
   +'</div>';
 }
