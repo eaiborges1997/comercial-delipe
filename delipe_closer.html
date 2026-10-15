@@ -5547,6 +5547,351 @@ function iniciarListenerSdr(){
 }
 var _lastSdrUpdate = 0;
 
+
+// ==================== ASSISTENTE (perguntas e respostas sobre os dados) ====================
+var IA_MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+var _iaCache = {};
+var _iaHist = [];
+
+function _iaNorm(t){
+  return (t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+}
+function _iaMoeda(v){ return 'R$ ' + (Math.round(v||0)).toLocaleString('pt-BR'); }
+
+// ---- Acesso aos dados (Firestore) ----
+async function _iaLeadsDoMes(mes, ano, email){
+  var emailKey = (email||emailAtivo()).replace(/[^a-zA-Z0-9]/g,'_');
+  var chave = emailKey+'__'+mes+'_'+ano;
+  if(_iaCache[chave]) return _iaCache[chave];
+  if(!window._fb) return [];
+  try {
+    var snap = await window._fb.getDoc(window._fb.doc(window._fb.db,'leads',chave));
+    var arr = (snap.exists() && snap.data().leads) ? snap.data().leads : [];
+    _iaCache[chave] = arr;
+    return arr;
+  } catch(e){ return []; }
+}
+
+async function _iaLeadsDosMeses(meses, ano, email){
+  var todos = [];
+  for(var i=0;i<meses.length;i++){
+    var ls = await _iaLeadsDoMes(meses[i], ano, email);
+    ls.forEach(function(l){ var c = Object.assign({}, l); c._mes = meses[i]; todos.push(c); });
+  }
+  return todos;
+}
+
+function _iaComb(l){
+  return (l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
+}
+
+function _iaAgrega(ls){
+  var o = {qtd:ls.length, vendidos:0, comb:0, pago:0, mrr:0, mrrBi:0, prod:0, impl:0, ev:0, proj:0,
+           rec:0, recPagas:0, bi:0, biPagos:0, inicial:0, noshow:0, contratos:0, qualif:0,
+           canais:{}, listaVend:[], listaAberto:[]};
+  ls.forEach(function(l){
+    if(l.statusInicial==='Realizada/Avancou'||l.statusInicial==='Realizada/Nao avancou') o.inicial++;
+    if(l.statusInicial==='Inicial No-show'||l.statusProposta==='Proposta No-show'||l.statusFollowup==='Follow-up No-show') o.noshow++;
+    if(l.contrato==='Assinado') o.contratos++;
+    if(l.qualificacao==='Qualificado'||l.qualificacao==='Qualificado+') o.qualif++;
+    if(l.status!=='Vendido') return;
+    var comb = _iaComb(l);
+    var pago = l.pago==='Pago';
+    o.vendidos++; o.comb += comb;
+    o.mrr += (l.mrrServ||0); o.mrrBi += (l.mrrBi||0); o.prod += (l.produto||0);
+    o.impl += (l.impl||0); o.ev += (l.evento||0); o.proj += (l.projetoPersonalizado||0);
+    if(pago) o.pago += comb;
+    if((l.mrrServ||0)>0 || (l.mrrBi||0)>0){ o.rec++; if(pago) o.recPagas++; }
+    if((l.mrrBi||0)>0){ o.bi++; if(pago) o.biPagos++; }
+    var cn = l.canal || '—';
+    if(!o.canais[cn]) o.canais[cn] = {qtd:0, valor:0};
+    o.canais[cn].qtd++; o.canais[cn].valor += comb;
+    var item = {emp:(l.empresa||'(sem nome)'), valor:comb, canal:cn, mes:l._mes||'', pago:pago};
+    o.listaVend.push(item);
+    if(!pago) o.listaAberto.push(item);
+  });
+  o.listaVend.sort(function(a,b){ return b.valor-a.valor; });
+  o.listaAberto.sort(function(a,b){ return b.valor-a.valor; });
+  return o;
+}
+
+// ---- Interpretacao da pergunta ----
+function _iaPeriodo(q){
+  var ma = getMesAno();
+  var ano = ma.ano;
+  var mAno = q.match(/\b(20\d{2})\b/);
+  if(mAno) ano = mAno[1];
+  var achados = [];
+  IA_MESES.forEach(function(m){
+    if(q.indexOf(_iaNorm(m)) >= 0) achados.push(m);
+  });
+  if(q.indexOf('trimestre') >= 0 || /\bq[1-4]\b/.test(q)){
+    var qm = q.match(/\bq([1-4])\b/);
+    var idx;
+    if(qm) idx = (parseInt(qm[1],10)-1)*3;
+    else if(achados.length) idx = Math.floor(IA_MESES.indexOf(achados[0])/3)*3;
+    else idx = Math.floor(IA_MESES.indexOf(ma.mes)/3)*3;
+    return {meses: IA_MESES.slice(idx, idx+3), ano: ano, label:'Q'+(idx/3+1)+' '+ano};
+  }
+  if(q.indexOf('no ano') >= 0 || q.indexOf('do ano') >= 0 || q.indexOf('ano todo') >= 0)
+    return {meses: IA_MESES.slice(), ano: ano, label:'ano de '+ano};
+  if(q.indexOf('mes passado') >= 0){
+    var i = IA_MESES.indexOf(ma.mes) - 1;
+    if(i < 0){ i = 11; ano = String(parseInt(ano,10)-1); }
+    return {meses:[IA_MESES[i]], ano: ano, label: IA_MESES[i]+' de '+ano};
+  }
+  if(achados.length) return {meses: achados, ano: ano, label: achados.join(', ')+' de '+ano};
+  return {meses:[ma.mes], ano: ano, label: ma.mes+' de '+ano, atual:true};
+}
+
+function _iaCloser(q){
+  var alvo = {email: emailAtivo(), nome:'', outro:false};
+  if(!isAdmin) return alvo;
+  var achou = null;
+  Object.keys(PERFIS_CACHE || {}).forEach(function(em){
+    var p = PERFIS_CACHE[em] || {};
+    var nome = _iaNorm(p.nome || em.split('@')[0]);
+    var primeiro = nome.split(' ')[0];
+    if(primeiro && primeiro.length > 2 && q.indexOf(primeiro) >= 0) achou = {email: em, nome: (p.nome||primeiro)};
+  });
+  if(achou){ alvo.email = achou.email; alvo.nome = achou.nome; alvo.outro = (achou.email !== emailAtivo()); }
+  return alvo;
+}
+
+function _iaTabela(itens, limite){
+  if(!itens.length) return '<div class="ia-vazio">Nenhum lead nesse filtro.</div>';
+  var l = itens.slice(0, limite||8);
+  return '<table class="ia-tab"><tbody>' + l.map(function(i){
+    return '<tr><td>'+i.emp+'</td><td class="ia-dim">'+(i.mes?i.mes.substring(0,3)+' · ':'')+i.canal+'</td>'
+      +'<td class="ia-val">'+_iaMoeda(i.valor)+'</td></tr>';
+  }).join('') + '</tbody></table>'
+  + (itens.length > l.length ? '<div class="ia-dim" style="margin-top:6px">+ '+(itens.length-l.length)+' outros</div>' : '');
+}
+
+// ---- Respostas ----
+async function _iaResponder(pergunta){
+  var q = _iaNorm(pergunta);
+  if(!q) return 'Pode perguntar algo como "quanto vendi em outubro".';
+  if(!currentUser) return 'Faça login primeiro para eu conseguir ler os dados.';
+
+  var per = _iaPeriodo(q);
+  var alvo = _iaCloser(q);
+  var quem = alvo.outro ? (alvo.nome||alvo.email.split('@')[0]) : 'você';
+  var ls = await _iaLeadsDosMeses(per.meses, per.ano, alvo.email);
+  var a = _iaAgrega(ls);
+  var cab = '<div class="ia-cab">'+per.label+(alvo.outro?' · '+(alvo.nome||alvo.email.split('@')[0]):'')+'</div>';
+
+  // Recorrencias / campanha
+  if(q.indexOf('recorrenc') >= 0 || q.indexOf('campanha') >= 0 || (q.indexOf('falta') >= 0 && q.indexOf('15') >= 0)){
+    var faltam = Math.max(0, 15 - a.rec);
+    return cab + '<b>'+a.rec+' recorrências</b> vendidas ('+a.recPagas+' já pagas).<br>'
+      + (a.rec >= 15
+          ? 'Meta de 15 batida: <b>+ R$ 15.000</b> de bônus.'
+          : 'Faltam <b>'+faltam+'</b> para os R$ 15.000 do trimestre.');
+  }
+
+  // Power BI
+  if(q.indexOf('power bi') >= 0 || /\bbi\b/.test(q)){
+    var fbi = Math.max(0, 9 - a.bi);
+    return cab + '<b>'+a.bi+' Power BI</b> vendidos ('+a.biPagos+' pagos), somando '+_iaMoeda(a.mrrBi)+' de MRR.<br>'
+      + (a.bi >= 9 ? 'Meta de 9 batida: <b>+ R$ 5.000</b>.' : 'Faltam <b>'+fbi+'</b> para os R$ 5.000.');
+  }
+
+  // A receber / nao pagos
+  if((q.indexOf('nao pago') >= 0 || q.indexOf('receber') >= 0 || q.indexOf('pendente') >= 0 || q.indexOf('em aberto') >= 0)
+     && q.indexOf('quanto ja') < 0 && q.indexOf('comiss') < 0){
+    var aberto = a.comb - a.pago;
+    return cab + 'Em aberto: <b>'+_iaMoeda(aberto)+'</b> em '+a.listaAberto.length+' leads vendidos e ainda não pagos.'
+      + _iaTabela(a.listaAberto);
+  }
+
+  // Pago / recebido
+  if(q.indexOf('pago') >= 0 || q.indexOf('recebi') >= 0 || q.indexOf('confirmad') >= 0){
+    return cab + 'Pago/confirmado: <b>'+_iaMoeda(a.pago)+'</b> de '+_iaMoeda(a.comb)+' vendidos.<br>'
+      + 'Faltam entrar '+_iaMoeda(a.comb - a.pago)+'.';
+  }
+
+  // Meta
+  if(q.indexOf('meta') >= 0 || q.indexOf('falta') >= 0){
+    var metaMes = (typeof META_PADRAO !== 'undefined' ? META_PADRAO : 125000) * per.meses.length;
+    var idealMes = (typeof META_IDEAL_PADRAO !== 'undefined' ? META_IDEAL_PADRAO : 150000) * per.meses.length;
+    var pct = metaMes ? Math.round(a.comb/metaMes*100) : 0;
+    return cab + 'Vendido: <b>'+_iaMoeda(a.comb)+'</b> · meta '+_iaMoeda(metaMes)+' ('+pct+'%).<br>'
+      + (a.comb >= metaMes
+          ? 'Meta batida. Faltam '+_iaMoeda(Math.max(0, idealMes-a.comb))+' para a meta ideal de '+_iaMoeda(idealMes)+'.'
+          : 'Faltam <b>'+_iaMoeda(metaMes-a.comb)+'</b> para a meta.');
+  }
+
+  // Canal
+  if(q.indexOf('canal') >= 0 || q.indexOf('origem') >= 0){
+    var arr = Object.keys(a.canais).map(function(c){ return {c:c, v:a.canais[c].valor, q:a.canais[c].qtd}; })
+                    .sort(function(x,y){ return y.v-x.v; });
+    if(!arr.length) return cab + 'Nenhuma venda nesse período.';
+    return cab + 'Melhor canal: <b>'+arr[0].c+'</b> com '+_iaMoeda(arr[0].v)+' em '+arr[0].q+' vendas.'
+      + '<table class="ia-tab"><tbody>' + arr.map(function(i){
+          return '<tr><td>'+i.c+'</td><td class="ia-dim">'+i.q+' vendas</td><td class="ia-val">'+_iaMoeda(i.v)+'</td></tr>';
+        }).join('') + '</tbody></table>';
+  }
+
+  // Reunioes / no-show
+  if(q.indexOf('reuni') >= 0 || q.indexOf('no-show') >= 0 || q.indexOf('no show') >= 0){
+    return cab + '<b>'+a.inicial+'</b> reuniões iniciais realizadas · <b>'+a.noshow+'</b> no-shows · '
+      + a.qtd+' leads no total.';
+  }
+
+  // Conversao
+  if(q.indexOf('convers') >= 0 || q.indexOf('taxa') >= 0){
+    var conv = a.qualif ? (a.vendidos/a.qualif*100) : 0;
+    return cab + '<b>'+conv.toFixed(1)+'%</b> de conversão — '+a.vendidos+' vendas sobre '+a.qualif+' leads qualificados.';
+  }
+
+  // Ticket medio
+  if(q.indexOf('ticket') >= 0 || q.indexOf('media por venda') >= 0){
+    var tk = a.vendidos ? a.comb/a.vendidos : 0;
+    return cab + 'Ticket médio: <b>'+_iaMoeda(tk)+'</b> em '+a.vendidos+' vendas.';
+  }
+
+  // Comissao (apenas mes atual carregado na tela)
+  if(q.indexOf('comiss') >= 0 || q.indexOf('ganhar') >= 0 || q.indexOf('receb') >= 0){
+    var proj = document.getElementById('total-proj');
+    var real = document.getElementById('total-real');
+    if(per.atual && !alvo.outro && proj && real){
+      return cab + 'Projeção total: <b>'+proj.textContent+'</b><br>Confirmada (só pagos): <b>'+real.textContent+'</b>'
+        + '<div class="ia-dim" style="margin-top:6px">Detalhe completo na aba Comissão.</div>';
+    }
+    return cab + 'A comissão detalhada só calculo para o mês aberto na tela. Vendido no período: <b>'+_iaMoeda(a.comb)+'</b>, pago '+_iaMoeda(a.pago)+'.';
+  }
+
+  // Lista de vendas / faturamento (padrao)
+  if(q.indexOf('vend') >= 0 || q.indexOf('faturamento') >= 0 || q.indexOf('quanto') >= 0 || q.indexOf('total') >= 0 || q.indexOf('lead') >= 0){
+    return cab + (alvo.outro ? (alvo.nome||'Ele') : 'Você') + ' vendeu <b>'+_iaMoeda(a.comb)+'</b> em '+a.vendidos+' negócios'
+      + ' (pago: '+_iaMoeda(a.pago)+').<br>'
+      + '<span class="ia-dim">MRR serviço '+_iaMoeda(a.mrr)+' · MRR BI '+_iaMoeda(a.mrrBi)+' · produto '+_iaMoeda(a.prod)
+      + ' · implantação '+_iaMoeda(a.impl)+'</span>'
+      + _iaTabela(a.listaVend);
+  }
+
+  return 'Não entendi essa. Tente, por exemplo: <i>quanto vendi em outubro</i>, <i>quantas recorrências faltam</i>, <i>o que está em aberto</i>, <i>qual canal mais vendeu</i> ou <i>quantas reuniões realizei</i>.';
+}
+
+// ---- Interface ----
+function iaToggle(){
+  var p = document.getElementById('ia-panel');
+  if(!p) return;
+  var abrindo = p.style.display !== 'flex';
+  p.style.display = abrindo ? 'flex' : 'none';
+  if(abrindo){
+    _iaCache = {};
+    var inp = document.getElementById('ia-input');
+    if(inp) inp.focus();
+  }
+}
+
+function iaSugestao(t){
+  var inp = document.getElementById('ia-input');
+  if(inp){ inp.value = t; iaEnviar(); }
+}
+
+function _iaBolha(texto, lado){
+  var box = document.getElementById('ia-msgs');
+  if(!box) return null;
+  var d = document.createElement('div');
+  d.className = 'ia-msg ia-' + lado;
+  d.innerHTML = texto;
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+  return d;
+}
+
+async function iaEnviar(){
+  var inp = document.getElementById('ia-input');
+  if(!inp) return;
+  var txt = inp.value.trim();
+  if(!txt) return;
+  inp.value = '';
+  _iaBolha(txt.replace(/</g,'&lt;'), 'user');
+  var pensando = _iaBolha('<span class="ia-dim">consultando...</span>', 'bot');
+  try {
+    var r = await _iaResponder(txt);
+    if(pensando) pensando.innerHTML = r;
+  } catch(e){
+    if(pensando) pensando.innerHTML = 'Deu erro ao buscar os dados: ' + (e && e.message ? e.message : e);
+  }
+  var box = document.getElementById('ia-msgs');
+  if(box) box.scrollTop = box.scrollHeight;
+}
+
+function _iaMontarUI(){
+  if(document.getElementById('ia-fab')) return;
+  var css = document.createElement('style');
+  css.textContent = ''
+    + '#ia-fab{position:fixed;right:22px;bottom:22px;z-index:9998;cursor:pointer;border:none;'
+    + 'background:linear-gradient(135deg,#ff6b00,#ff9940);color:#fff;font-weight:700;font-size:14px;'
+    + 'padding:13px 20px;border-radius:30px;box-shadow:0 6px 20px rgba(255,107,0,.35);font-family:Inter,sans-serif;display:none}'
+    + '#ia-panel{position:fixed;right:22px;bottom:84px;z-index:9999;width:400px;max-width:calc(100vw - 32px);'
+    + 'height:520px;max-height:calc(100vh - 120px);background:#1a1030;border:.5px solid rgba(255,255,255,.14);'
+    + 'border-radius:16px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.5);font-family:Inter,sans-serif}'
+    + '#ia-panel .ia-head{padding:14px 16px;border-bottom:.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center}'
+    + '#ia-panel .ia-head b{color:#ff9940;font-size:12px;letter-spacing:.1em;text-transform:uppercase}'
+    + '#ia-msgs{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}'
+    + '.ia-msg{font-size:13px;line-height:1.5;padding:10px 12px;border-radius:10px;max-width:92%}'
+    + '.ia-user{align-self:flex-end;background:rgba(255,107,0,.18);color:#fff}'
+    + '.ia-bot{align-self:flex-start;background:rgba(255,255,255,.05);color:rgba(255,255,255,.9)}'
+    + '.ia-dim{color:rgba(255,255,255,.45);font-size:12px}'
+    + '.ia-cab{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#ff9940;margin-bottom:6px}'
+    + '.ia-vazio{color:rgba(255,255,255,.4);font-size:12px;padding:6px 0}'
+    + '.ia-tab{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}'
+    + '.ia-tab td{padding:5px 0;border-top:.5px solid rgba(255,255,255,.07)}'
+    + '.ia-tab .ia-val{text-align:right;color:#fff;font-weight:700;white-space:nowrap}'
+    + '.ia-sug{padding:0 16px 10px;display:flex;gap:6px;flex-wrap:wrap}'
+    + '.ia-sug button{cursor:pointer;background:transparent;border:.5px solid rgba(255,255,255,.14);color:rgba(255,255,255,.6);'
+    + 'font-size:11px;padding:5px 10px;border-radius:14px;font-family:Inter,sans-serif}'
+    + '.ia-foot{padding:12px 16px;border-top:.5px solid rgba(255,255,255,.08);display:flex;gap:8px}'
+    + '.ia-foot input{flex:1;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.14);border-radius:10px;'
+    + 'padding:10px 12px;color:#fff;font-size:13px;outline:none;font-family:Inter,sans-serif}'
+    + '.ia-foot button{cursor:pointer;background:#ff6b00;border:none;color:#fff;font-weight:700;border-radius:10px;padding:0 16px;font-size:13px}';
+  document.head.appendChild(css);
+
+  var fab = document.createElement('button');
+  fab.id = 'ia-fab';
+  fab.innerHTML = '💬 Assistente';
+  fab.onclick = iaToggle;
+  document.body.appendChild(fab);
+
+  var p = document.createElement('div');
+  p.id = 'ia-panel';
+  p.innerHTML = ''
+    + '<div class="ia-head"><b>Assistente de dados</b>'
+    + '<button onclick="iaToggle()" style="cursor:pointer;background:transparent;border:.5px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:8px;padding:4px 10px;font-size:12px">Fechar</button></div>'
+    + '<div id="ia-msgs"><div class="ia-msg ia-bot">Pergunte o que quiser sobre seus números. Ex.: <i>quanto vendi em outubro</i>, <i>quantas recorrências faltam</i>, <i>o que está em aberto</i>.</div></div>'
+    + '<div class="ia-sug">'
+    + '<button onclick="iaSugestao(\'quanto vendi este mes\')">Vendas do mês</button>'
+    + '<button onclick="iaSugestao(\'quantas recorrencias no trimestre\')">Recorrências</button>'
+    + '<button onclick="iaSugestao(\'o que esta em aberto\')">A receber</button>'
+    + '<button onclick="iaSugestao(\'qual canal mais vendeu no trimestre\')">Canais</button>'
+    + '<button onclick="iaSugestao(\'quanto falta para a meta\')">Meta</button>'
+    + '</div>'
+    + '<div class="ia-foot"><input id="ia-input" placeholder="Digite sua pergunta..." autocomplete="off"><button onclick="iaEnviar()">Enviar</button></div>';
+  document.body.appendChild(p);
+
+  var inp = document.getElementById('ia-input');
+  if(inp) inp.addEventListener('keydown', function(e){ if(e.key === 'Enter') iaEnviar(); });
+
+  setInterval(function(){
+    var login = document.getElementById('login-screen');
+    var logado = login && login.classList.contains('hidden');
+    fab.style.display = logado ? 'block' : 'none';
+    if(!logado) p.style.display = 'none';
+  }, 800);
+}
+
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _iaMontarUI);
+else _iaMontarUI();
+
+window.iaToggle = iaToggle;
+window.iaEnviar = iaEnviar;
+window.iaSugestao = iaSugestao;
+
 </script>
 </body>
 </html>
