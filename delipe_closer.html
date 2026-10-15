@@ -5548,7 +5548,7 @@ function iniciarListenerSdr(){
 var _lastSdrUpdate = 0;
 
 
-// ==================== ASSISTENTE (perguntas e respostas sobre os dados) ====================
+// ==================== ASSISTENTE DE INTELIGENCIA COMERCIAL ====================
 var IA_MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 var _iaCache = {};
 
@@ -5562,8 +5562,16 @@ function _iaMoedaCurta(v){
   if(Math.abs(v) >= 1000) return 'R$ ' + (v/1000).toFixed(1).replace('.',',') + 'k';
   return 'R$ ' + v.toLocaleString('pt-BR');
 }
+function _iaPct(a,b){ return b ? (a/b*100) : 0; }
+function _iaDias(d1, d2){
+  if(!d1 || !d2) return null;
+  var a = new Date(d1), b = new Date(d2);
+  if(isNaN(a) || isNaN(b)) return null;
+  var dif = (b - a) / 86400000;
+  return (dif >= 0 && dif < 400) ? dif : null;
+}
 
-// ---- Acesso aos dados (Firestore) ----
+// ---- Acesso aos dados ----
 async function _iaLeadsDoMes(mes, ano, email){
   var emailKey = (email||emailAtivo()).replace(/[^a-zA-Z0-9]/g,'_');
   var chave = emailKey+'__'+mes+'_'+ano;
@@ -5576,45 +5584,138 @@ async function _iaLeadsDoMes(mes, ano, email){
     return arr;
   } catch(e){ return []; }
 }
-
 async function _iaLeadsDosMeses(meses, ano, email){
   var todos = [];
   for(var i=0;i<meses.length;i++){
     var ls = await _iaLeadsDoMes(meses[i], ano, email);
-    ls.forEach(function(l){ var c = Object.assign({}, l); c._mes = meses[i]; todos.push(c); });
+    ls.forEach(function(l){ var c = Object.assign({}, l); c._mes = meses[i]; c._ano = ano; todos.push(c); });
   }
   return todos;
 }
+function _iaClosersConhecidos(){
+  var out = [];
+  Object.keys(PERFIS_CACHE || {}).forEach(function(em){
+    var p = PERFIS_CACHE[em] || {};
+    if(p.perfil !== 'sdr') out.push({email: em, nome: (p.nome || em.split('@')[0])});
+  });
+  if(!out.length && currentUser) out.push({email: currentUser.email, nome: currentUser.email.split('@')[0]});
+  return out;
+}
 
+// ---- Valores do lead ----
 function _iaComb(l){
   return (l.mrrServ||0)+(l.mrrBi||0)+(l.produto||0)+(l.evento||0)+(l.impl||0)+(l.projetoPersonalizado||0);
 }
+function _iaMrr(l){ return (l.mrrServ||0)+(l.mrrBi||0); }
+function _iaVendido(l){ return l.status === 'Vendido'; }
+function _iaPago(l){ return l.pago === 'Pago'; }
+function _iaInicialRealizada(l){
+  return l.statusInicial==='Realizada/Avancou' || l.statusInicial==='Realizada/Nao avancou' || l.statusInicial==='Venda em ligacao';
+}
+function _iaInicialAgendada(l){ return !!l.dtInicial || l.status==='Inicial Agendada' || (l.statusInicial && l.statusInicial!=='—'); }
+function _iaNoShow(l){
+  return l.statusInicial==='Inicial No-show' || l.statusProposta==='Proposta No-show' || l.statusFollowup==='Follow-up No-show';
+}
+function _iaCancelada(l){
+  return l.statusInicial==='Cancelada' || l.statusProposta==='Cancelada' || l.statusFollowup==='Cancelada'
+      || l.statusInicial==='Aguardando nova data' || l.statusProposta==='Aguardando nova data';
+}
+function _iaPropostaApresentada(l){
+  return !!l.dtProposta || l.statusProposta==='Realizada' || l.statusProposta==='Venda em ligacao';
+}
+function _iaAvancouProposta(l){ return l.statusInicial==='Realizada/Avancou' || _iaPropostaApresentada(l); }
+function _iaPerdido(l){
+  return l.status==='Nao convertido' || l.status==='Declinou' || l.status==='Nao e Provedor' || l.status==='Telefone Invalido';
+}
+function _iaEmNegociacao(l){
+  return l.status==='Em negociacao' || l.status==='Negociacao' || l.status==='Respondeu' || l.status==='Contato Feito';
+}
+function _iaQualificado(l){ return l.qualificacao==='Qualificado' || l.qualificacao==='Qualificado+'; }
 
+// ---- Comissao (mesma regra do sistema, mes a mes) ----
+function _iaComissaoMes(ls){
+  var vend = ls.filter(_iaVendido);
+  var pagos = vend.filter(_iaPago);
+  var totalVendido = vend.reduce(function(s,l){ return s + _iaComb(l); }, 0);
+  var totalPago = pagos.reduce(function(s,l){ return s + _iaComb(l); }, 0);
+  var gatilho = totalPago >= PARAMS.totalMin;
+  var nivelProj = totalVendido >= PARAMS.totalIdeal ? 'ideal' : 'min';
+  var nivelReal = gatilho ? (totalPago >= PARAMS.totalIdeal ? 'ideal' : 'min') : 'abaixo';
+  function calc(set, nivel){
+    var total = 0, porCanal = {}, porServico = {};
+    if(nivel === 'abaixo') return {total:0, porCanal:porCanal, porServico:porServico};
+    set.forEach(function(l){
+      var p = PARAMS.comissao[l.canal];
+      if(!p) return;
+      var pM = nivel==='ideal' ? p.mrrIdeal : p.mrrMin;
+      var pP = nivel==='ideal' ? p.prodIdeal : p.prodMin;
+      var pJ = nivel==='ideal' ? p.projIdeal : p.projMin;
+      var c = _iaMrr(l)*pM + (l.produto||0)*pP + (l.projetoPersonalizado||0)*pJ;
+      total += c;
+      porCanal[l.canal] = (porCanal[l.canal]||0) + c;
+      var sv = l.servico || 'Nao informado';
+      porServico[sv] = (porServico[sv]||0) + c;
+    });
+    return {total:total, porCanal:porCanal, porServico:porServico};
+  }
+  var proj = calc(vend, nivelProj);
+  var real = calc(pagos, nivelReal);
+  return {projecao:proj, confirmada:real, gatilho:gatilho, totalPago:totalPago, totalVendido:totalVendido, nivelProj:nivelProj, nivelReal:nivelReal};
+}
+
+// ---- Agregado geral ----
 function _iaAgrega(ls){
-  var o = {qtd:ls.length, vendidos:0, comb:0, pago:0, mrr:0, mrrBi:0, prod:0, impl:0, ev:0, proj:0,
-           rec:0, recPagas:0, bi:0, biPagos:0, inicial:0, noshow:0, contratos:0, qualif:0,
-           canais:{}, porMes:{}, listaVend:[], listaAberto:[]};
+  var o = {qtd:0, qualif:0, agendadas:0, inicial:0, noshow:0, cancel:0, propostas:0, avancou:0,
+           negociacao:0, perdidos:0, vendidos:0, contratos:0,
+           comb:0, pago:0, mrr:0, mrrServ:0, mrrBi:0, prod:0, impl:0, ev:0, proj:0,
+           rec:0, recPagas:0, bi:0, biPagos:0,
+           canais:{}, servicos:{}, sdrs:{}, porStatus:{}, porMes:{},
+           listaVend:[], listaAberto:[], listaPerdidos:[],
+           temposLeadReuniao:[], temposReuniaoProposta:[], temposLeadVenda:[]};
   ls.forEach(function(l){
+    o.qtd++;
     var mes = l._mes || '';
-    if(!o.porMes[mes]) o.porMes[mes] = {comb:0, vendidos:0, rec:0};
-    if(l.statusInicial==='Realizada/Avancou'||l.statusInicial==='Realizada/Nao avancou') o.inicial++;
-    if(l.statusInicial==='Inicial No-show'||l.statusProposta==='Proposta No-show'||l.statusFollowup==='Follow-up No-show') o.noshow++;
-    if(l.contrato==='Assinado') o.contratos++;
-    if(l.qualificacao==='Qualificado'||l.qualificacao==='Qualificado+') o.qualif++;
-    if(l.status!=='Vendido') return;
-    var comb = _iaComb(l);
-    var pago = l.pago==='Pago';
+    if(!o.porMes[mes]) o.porMes[mes] = {leads:0, inicial:0, propostas:0, vendidos:0, comb:0, pago:0, rec:0, comissao:0};
+    o.porMes[mes].leads++;
+    var cn = l.canal || 'Nao informado';
+    if(!o.canais[cn]) o.canais[cn] = {leads:0, inicial:0, propostas:0, vendidos:0, valor:0, mrr:0, comissao:0};
+    o.canais[cn].leads++;
+    var sv = l.servico || 'Nao informado';
+    if(!o.servicos[sv]) o.servicos[sv] = {leads:0, propostas:0, vendidos:0, valor:0, mrr:0};
+    o.servicos[sv].leads++;
+    var sd = l.sdr || 'Nao informado';
+    if(!o.sdrs[sd]) o.sdrs[sd] = {leads:0, inicial:0, vendidos:0, valor:0};
+    o.sdrs[sd].leads++;
+    o.porStatus[l.status||'—'] = (o.porStatus[l.status||'—']||0) + 1;
+
+    if(_iaQualificado(l)) o.qualif++;
+    if(_iaInicialAgendada(l)) o.agendadas++;
+    if(_iaInicialRealizada(l)){ o.inicial++; o.canais[cn].inicial++; o.sdrs[sd].inicial++; o.porMes[mes].inicial++; }
+    if(_iaNoShow(l)) o.noshow++;
+    if(_iaCancelada(l)) o.cancel++;
+    if(_iaPropostaApresentada(l)){ o.propostas++; o.canais[cn].propostas++; o.servicos[sv].propostas++; o.porMes[mes].propostas++; }
+    if(_iaAvancouProposta(l)) o.avancou++;
+    if(_iaEmNegociacao(l)) o.negociacao++;
+    if(_iaPerdido(l)){ o.perdidos++; o.listaPerdidos.push({emp:(l.empresa||'(sem nome)'), canal:cn, mes:mes, valor:0, pago:false}); }
+    if(l.contrato === 'Assinado') o.contratos++;
+
+    var t1 = _iaDias(l.dtAgendamento, l.dtInicial); if(t1 !== null) o.temposLeadReuniao.push(t1);
+    var t2 = _iaDias(l.dtInicial, l.dtProposta); if(t2 !== null) o.temposReuniaoProposta.push(t2);
+    var t3 = _iaDias(l.dtAgendamento, l.dtVenda); if(t3 !== null) o.temposLeadVenda.push(t3);
+
+    if(!_iaVendido(l)) return;
+    var comb = _iaComb(l), pago = _iaPago(l);
     o.vendidos++; o.comb += comb;
-    o.porMes[mes].comb += comb; o.porMes[mes].vendidos++;
-    o.mrr += (l.mrrServ||0); o.mrrBi += (l.mrrBi||0); o.prod += (l.produto||0);
-    o.impl += (l.impl||0); o.ev += (l.evento||0); o.proj += (l.projetoPersonalizado||0);
-    if(pago) o.pago += comb;
-    if((l.mrrServ||0)>0 || (l.mrrBi||0)>0){ o.rec++; o.porMes[mes].rec++; if(pago) o.recPagas++; }
-    if((l.mrrBi||0)>0){ o.bi++; if(pago) o.biPagos++; }
-    var cn = l.canal || '—';
-    if(!o.canais[cn]) o.canais[cn] = {qtd:0, valor:0};
-    o.canais[cn].qtd++; o.canais[cn].valor += comb;
-    var item = {emp:(l.empresa||'(sem nome)'), valor:comb, canal:cn, mes:mes, pago:pago};
+    o.canais[cn].vendidos++; o.canais[cn].valor += comb; o.canais[cn].mrr += _iaMrr(l);
+    o.servicos[sv].vendidos++; o.servicos[sv].valor += comb; o.servicos[sv].mrr += _iaMrr(l);
+    o.sdrs[sd].vendidos++; o.sdrs[sd].valor += comb;
+    o.porMes[mes].vendidos++; o.porMes[mes].comb += comb;
+    o.mrr += _iaMrr(l); o.mrrServ += (l.mrrServ||0); o.mrrBi += (l.mrrBi||0);
+    o.prod += (l.produto||0); o.impl += (l.impl||0); o.ev += (l.evento||0); o.proj += (l.projetoPersonalizado||0);
+    if(pago){ o.pago += comb; o.porMes[mes].pago += comb; }
+    if(_iaMrr(l) > 0){ o.rec++; o.porMes[mes].rec++; if(pago) o.recPagas++; }
+    if((l.mrrBi||0) > 0){ o.bi++; if(pago) o.biPagos++; }
+    var item = {emp:(l.empresa||'(sem nome)'), valor:comb, canal:cn, mes:mes, pago:pago, servico:sv};
     o.listaVend.push(item);
     if(!pago) o.listaAberto.push(item);
   });
@@ -5622,52 +5723,155 @@ function _iaAgrega(ls){
   o.listaAberto.sort(function(a,b){ return b.valor-a.valor; });
   return o;
 }
+function _iaMedia(arr){ return arr.length ? arr.reduce(function(s,v){ return s+v; },0)/arr.length : null; }
 
-// ---- Interpretacao da pergunta ----
+// ---- Interpretacao: periodo ----
 function _iaPeriodo(q){
   var ma = getMesAno();
-  var ano = ma.ano;
+  var anoRef = parseInt(ma.ano, 10);
   var mAno = q.match(/\b(20\d{2})\b/);
-  if(mAno) ano = mAno[1];
+  var anoPedido = mAno ? parseInt(mAno[1],10) : null;
+  var idxAtual = IA_MESES.indexOf(ma.mes);
+  if(idxAtual < 0) idxAtual = new Date().getMonth();
+  function par(i, ano){ return {mes: IA_MESES[((i%12)+12)%12], ano: String(ano + Math.floor(i/12))}; }
+  function faixa(fim, n, ano){
+    var out = [];
+    for(var k = n-1; k >= 0; k--) out.push(par(fim-k, ano));
+    return out;
+  }
   var achados = [];
-  IA_MESES.forEach(function(m){ if(q.indexOf(_iaNorm(m)) >= 0) achados.push(m); });
+  IA_MESES.forEach(function(m, i){ if(q.indexOf(_iaNorm(m)) >= 0) achados.push(i); });
+
+  var numPt = {um:1, dois:2, tres:3, quatro:4, cinco:5, seis:6, sete:7, oito:8, nove:9, dez:10, onze:11, doze:12};
+  var mUlt = q.match(/ultim[oa]s?\s+(\d{1,2}|um|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)\s*(meses|mes)/);
+  if(mUlt){
+    var n = parseInt(mUlt[1],10) || numPt[mUlt[1]] || 6;
+    return {lista: faixa(idxAtual, n, anoRef), label:'Últimos '+n+' meses', multi:true};
+  }
+  if(q.indexOf('semestre') >= 0){
+    var semIdx = (q.indexOf('1o semestre')>=0||q.indexOf('primeiro semestre')>=0) ? 0
+               : (q.indexOf('2o semestre')>=0||q.indexOf('segundo semestre')>=0) ? 1
+               : (idxAtual < 6 ? 0 : 1);
+    var a0 = anoPedido || anoRef;
+    var ls0 = [];
+    for(var i=semIdx*6; i<semIdx*6+6; i++) ls0.push({mes:IA_MESES[i], ano:String(a0)});
+    return {lista: ls0, label:(semIdx===0?'1º':'2º')+' semestre de '+a0, multi:true};
+  }
   if(q.indexOf('trimestre') >= 0 || /\bq[1-4]\b/.test(q)){
     var qm = q.match(/\bq([1-4])\b/);
-    var idx;
-    if(qm) idx = (parseInt(qm[1],10)-1)*3;
-    else if(achados.length) idx = Math.floor(IA_MESES.indexOf(achados[0])/3)*3;
-    else idx = Math.floor(IA_MESES.indexOf(ma.mes)/3)*3;
-    return {meses: IA_MESES.slice(idx, idx+3), ano: ano, label:'Q'+(idx/3+1)+' '+ano, tri:true};
+    var ini;
+    if(qm) ini = (parseInt(qm[1],10)-1)*3;
+    else if(achados.length) ini = Math.floor(achados[0]/3)*3;
+    else ini = Math.floor(idxAtual/3)*3;
+    var a1 = anoPedido || anoRef;
+    var ls1 = [];
+    for(var j=ini; j<ini+3; j++) ls1.push({mes:IA_MESES[j], ano:String(a1)});
+    return {lista: ls1, label:'Q'+(ini/3+1)+' '+a1, multi:true, tri:true};
   }
-  if(q.indexOf('no ano') >= 0 || q.indexOf('do ano') >= 0 || q.indexOf('ano todo') >= 0)
-    return {meses: IA_MESES.slice(), ano: ano, label:'Ano de '+ano};
-  if(q.indexOf('mes passado') >= 0){
-    var i = IA_MESES.indexOf(ma.mes) - 1;
-    if(i < 0){ i = 11; ano = String(parseInt(ano,10)-1); }
-    return {meses:[IA_MESES[i]], ano: ano, label: IA_MESES[i]+' de '+ano};
+  if(q.indexOf('no ano') >= 0 || q.indexOf('do ano') >= 0 || q.indexOf('ano todo') >= 0 || q.indexOf('este ano') >= 0 || q.indexOf('acumulado') >= 0){
+    var a2 = anoPedido || anoRef;
+    var ls2 = IA_MESES.map(function(m){ return {mes:m, ano:String(a2)}; });
+    return {lista: ls2, label:'Ano de '+a2, multi:true, ano:true};
   }
-  if(achados.length) return {meses: achados, ano: ano, label: achados.join(' + ')+' de '+ano};
-  return {meses:[ma.mes], ano: ano, label: ma.mes+' de '+ano, atual:true};
+  if(q.indexOf('mes passado') >= 0 || q.indexOf('mes anterior') >= 0)
+    return {lista:[par(idxAtual-1, anoRef)], label: par(idxAtual-1, anoRef).mes+' de '+par(idxAtual-1, anoRef).ano};
+  if(q.indexOf('hoje') >= 0)
+    return {lista:[{mes: ma.mes, ano: ma.ano}], label:'Hoje', dia:'hoje'};
+  if(q.indexOf('ontem') >= 0)
+    return {lista:[{mes: ma.mes, ano: ma.ano}], label:'Ontem', dia:'ontem'};
+  if(q.indexOf('semana') >= 0)
+    return {lista:[{mes: ma.mes, ano: ma.ano}], label:'Últimos 7 dias', dia:'semana'};
+  if(achados.length){
+    var a3 = anoPedido || anoRef;
+    var ls3 = achados.map(function(i){ return {mes:IA_MESES[i], ano:String(a3)}; });
+    return {lista: ls3, label: ls3.map(function(p){return p.mes;}).join(' + ')+' de '+a3, multi: ls3.length>1,
+            semAno: !anoPedido};
+  }
+  return {lista:[{mes: ma.mes, ano: ma.ano}], label: ma.mes+' de '+ma.ano, atual:true};
 }
 
+// ---- Interpretacao: filtros ----
+function _iaTem(q, termo){
+  var t = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^a-z0-9])'+t+'($|[^a-z0-9])').test(q);
+}
+function _iaFiltros(q){
+  var f = {canais:[], servicos:[], sdr:'', naoSuportado:[]};
+  if(_iaTem(q,'trafego') || q.indexOf('trafego pago') >= 0 || _iaTem(q,'ads')) f.canais.push('Trafego Pago');
+  if(_iaTem(q,'evento') || _iaTem(q,'eventos')) f.canais.push('Evento');
+  if(q.indexOf('canal sdr') >= 0 || q.indexOf('veio do sdr') >= 0 || q.indexOf('vieram do sdr') >= 0) f.canais.push('SDR');
+  if(q.indexOf('indicac') >= 0) f.canais.push('Indicacao');
+  if(_iaTem(q,'base')) f.canais.push('Base');
+  if(q.indexOf('live') >= 0) f.naoSuportado.push('O canal "Live" não existe no cadastro — os canais são Tráfego Pago, Evento, SDR, Base e Indicação.');
+  if(q.indexOf('motivo') >= 0) f.naoSuportado.push('O sistema não registra motivo de perda ou de cancelamento.');
+  if(q.indexOf('probabilidade') >= 0) f.naoSuportado.push('Não há campo de probabilidade de fechamento cadastrado.');
+
+  var ehCampanhaBi = (q.indexOf('power bi') >= 0 || q.indexOf('campanha') >= 0);
+  if(typeof SERVICOS !== 'undefined'){
+    SERVICOS.forEach(function(sv){
+      var n = _iaNorm(sv);
+      if(sv === 'BI' && ehCampanhaBi) return;
+      if(_iaTem(q, n) && f.servicos.indexOf(sv) < 0) f.servicos.push(sv);
+    });
+  }
+  if(q.indexOf('churn') >= 0 && f.servicos.indexOf('Assessoria de Churn') < 0) f.servicos.push('Assessoria de Churn');
+
+  if(typeof SDRS !== 'undefined' && (/\bsdr\b/.test(q) || q.indexOf('originou') >= 0)){
+    SDRS.forEach(function(s){
+      if(s === 'OUTRO') return;
+      var n = _iaNorm(s);
+      if(n.length > 2 && _iaTem(q, n)) f.sdr = s;
+    });
+  }
+  return f;
+}
+function _iaAplicaFiltros(ls, f, per){
+  return ls.filter(function(l){
+    if(f.canais.length && f.canais.indexOf(l.canal) < 0) return false;
+    if(f.servicos.length && f.servicos.indexOf(l.servico) < 0) return false;
+    if(f.sdr && l.sdr !== f.sdr) return false;
+    if(per && per.dia){
+      var base = l.dtVenda || l.dtInicial || l.dtAgendamento;
+      if(!base) return false;
+      var d = new Date(base), hoje = new Date();
+      if(isNaN(d)) return false;
+      var difDias = Math.floor((new Date(hoje.toDateString()) - new Date(d.toDateString()))/86400000);
+      if(per.dia === 'hoje' && difDias !== 0) return false;
+      if(per.dia === 'ontem' && difDias !== 1) return false;
+      if(per.dia === 'semana' && (difDias < 0 || difDias > 7)) return false;
+    }
+    return true;
+  });
+}
 function _iaCloser(q){
-  var alvo = {email: emailAtivo(), nome:'', outro:false};
+  var alvo = {email: emailAtivo(), nome:'', outro:false, equipe:false};
   if(!isAdmin) return alvo;
+  if(q.indexOf('equipe') >= 0 || q.indexOf('time') >= 0 || q.indexOf('cada closer') >= 0 || q.indexOf('quem vendeu') >= 0
+     || q.indexOf('ranking') >= 0 || q.indexOf('todos os closers') >= 0 || q.indexOf('melhor closer') >= 0){
+    alvo.equipe = true;
+    return alvo;
+  }
   var achou = null;
-  Object.keys(PERFIS_CACHE || {}).forEach(function(em){
-    var p = PERFIS_CACHE[em] || {};
-    var nome = _iaNorm(p.nome || em.split('@')[0]);
-    var primeiro = nome.split(' ')[0];
-    if(primeiro && primeiro.length > 2 && q.indexOf(primeiro) >= 0) achou = {email: em, nome: (p.nome||primeiro)};
+  _iaClosersConhecidos().forEach(function(c){
+    var primeiro = _iaNorm(c.nome).split(' ')[0];
+    if(primeiro && primeiro.length > 2 && q.indexOf(primeiro) >= 0) achou = c;
   });
   if(achou){ alvo.email = achou.email; alvo.nome = achou.nome; alvo.outro = (achou.email !== emailAtivo()); }
   return alvo;
 }
 
 // ---- Blocos visuais ----
-function _iaCab(per, alvo){
-  var quem = alvo.outro ? (alvo.nome || alvo.email.split('@')[0]) : 'Meus dados';
-  return '<div class="ia-chips"><span class="ia-chip">'+per.label+'</span><span class="ia-chip">'+quem+'</span></div>';
+function _iaCab(per, alvo, f){
+  var chips = ['<span class="ia-chip">'+per.label+'</span>'];
+  chips.push('<span class="ia-chip">'+(alvo.equipe ? 'Equipe' : (alvo.outro ? (alvo.nome||alvo.email.split('@')[0]) : 'Meus dados'))+'</span>');
+  if(f && f.canais.length) chips.push('<span class="ia-chip">'+f.canais.join(' + ')+'</span>');
+  if(f && f.servicos.length) chips.push('<span class="ia-chip">'+f.servicos.join(' + ')+'</span>');
+  if(f && f.sdr) chips.push('<span class="ia-chip">SDR '+f.sdr+'</span>');
+  return '<div class="ia-chips">'+chips.join('')+'</div>';
+}
+function _iaAviso(f){
+  if(!f || !f.naoSuportado.length) return '';
+  return '<div class="ia-aviso">⚠ '+f.naoSuportado.join('<br>⚠ ')+'</div>';
 }
 function _iaCards(cards){
   return '<div class="ia-cards">' + cards.map(function(c){
@@ -5686,15 +5890,17 @@ function _iaProgresso(atual, meta, texto){
     + '<div class="ia-prog-txt"><span>'+texto+'</span><span class="'+(ok?'ia-ok':'')+'">'+pct+'%</span></div>'
     + '</div>';
 }
-function _iaBarras(itens){
+function _iaBarras(itens, formato){
+  itens = itens.filter(function(i){ return i.valor > 0; });
   if(!itens.length) return '<div class="ia-vazio">Sem dados no período.</div>';
   var max = Math.max.apply(null, itens.map(function(i){ return i.valor; })) || 1;
   return '<div class="ia-barras">' + itens.map(function(i){
-    var pct = Math.max(3, Math.round(i.valor/max*100));
+    var pct = Math.max(4, Math.round(i.valor/max*100));
+    var val = formato === 'num' ? i.valor : _iaMoedaCurta(i.valor);
     return '<div class="ia-barra-row">'
-      + '<div class="ia-barra-lbl">'+i.nome+'</div>'
+      + '<div class="ia-barra-lbl" title="'+i.nome+'">'+i.nome+'</div>'
       + '<div class="ia-barra-trk"><div class="ia-barra-in" style="width:'+pct+'%"></div></div>'
-      + '<div class="ia-barra-val">'+_iaMoedaCurta(i.valor)+(i.sub?'<span class="ia-dim"> · '+i.sub+'</span>':'')+'</div>'
+      + '<div class="ia-barra-val">'+val+(i.sub?'<span class="ia-dim"> · '+i.sub+'</span>':'')+'</div>'
       + '</div>';
   }).join('') + '</div>';
 }
@@ -5703,169 +5909,390 @@ function _iaLista(itens, limite){
   var l = itens.slice(0, limite||10);
   return '<div class="ia-lista">' + l.map(function(i){
     return '<div class="ia-lin">'
-      + '<div class="ia-lin-emp">'+i.emp+'<div class="ia-dim">'+(i.mes?i.mes+' · ':'')+i.canal+'</div></div>'
-      + '<div class="ia-lin-dir">'+_iaMoeda(i.valor)
-      + '<div class="ia-tag '+(i.pago?'ia-tag-ok':'ia-tag-pend')+'">'+(i.pago?'Pago':'A receber')+'</div></div>'
-      + '</div>';
+      + '<div class="ia-lin-emp">'+i.emp+'<div class="ia-dim">'+(i.mes?i.mes+' · ':'')+i.canal+(i.servico?' · '+i.servico:'')+'</div></div>'
+      + '<div class="ia-lin-dir">'+(i.valor?_iaMoeda(i.valor):'')
+      + (i.valor ? '<div class="ia-tag '+(i.pago?'ia-tag-ok':'ia-tag-pend')+'">'+(i.pago?'Pago':'A receber')+'</div>' : '')
+      + '</div></div>';
   }).join('') + '</div>'
-  + (itens.length > l.length ? '<div class="ia-dim" style="margin-top:8px">+ '+(itens.length-l.length)+' outros leads</div>' : '');
+  + (itens.length > l.length ? '<div class="ia-dim" style="margin-top:8px">+ '+(itens.length-l.length)+' outros</div>' : '');
+}
+// Regra obrigatoria: toda consulta multi-mes mostra a distribuicao mensal
+function _iaTabelaMeses(per, porMes, titulo){
+  var tot = {leads:0, inicial:0, propostas:0, vendidos:0, comb:0, comissao:0};
+  var linhas = per.lista.map(function(p){
+    var d = porMes[p.mes] || {leads:0, inicial:0, propostas:0, vendidos:0, comb:0, comissao:0};
+    tot.leads += d.leads; tot.inicial += d.inicial; tot.propostas += d.propostas;
+    tot.vendidos += d.vendidos; tot.comb += d.comb; tot.comissao += (d.comissao||0);
+    return '<tr><td>'+p.mes+'</td><td>'+d.leads+'</td><td>'+d.inicial+'</td><td>'+d.propostas+'</td>'
+      + '<td>'+d.vendidos+'</td><td class="ia-num">'+_iaMoedaCurta(d.comb)+'</td>'
+      + '<td class="ia-num">'+_iaMoedaCurta(d.comissao||0)+'</td></tr>';
+  }).join('');
+  return '<div class="ia-sub">'+(titulo||'Detalhamento mês a mês')+'</div>'
+    + '<table class="ia-tabela"><thead><tr><th>Mês</th><th>Leads</th><th>Reuniões</th><th>Propostas</th>'
+    + '<th>Vendas</th><th class="ia-num">Valor</th><th class="ia-num">Comissão</th></tr></thead>'
+    + '<tbody>'+linhas+'</tbody>'
+    + '<tfoot><tr><td>Total</td><td>'+tot.leads+'</td><td>'+tot.inicial+'</td><td>'+tot.propostas+'</td>'
+    + '<td>'+tot.vendidos+'</td><td class="ia-num">'+_iaMoedaCurta(tot.comb)+'</td>'
+    + '<td class="ia-num">'+_iaMoedaCurta(tot.comissao)+'</td></tr></tfoot></table>';
+}
+function _iaRank(obj, campo, formato){
+  return Object.keys(obj).map(function(k){
+    return {nome:k, valor:obj[k][campo], sub:(campo==='valor' ? obj[k].vendidos+' vendas' : '')};
+  }).sort(function(a,b){ return b.valor-a.valor; });
 }
 
-// ---- Respostas ----
+// ---- Carregar + agregar com filtros ----
+async function _iaCarregar(per, f, email){
+  var todos = [];
+  for(var i=0;i<per.lista.length;i++){
+    var p = per.lista[i];
+    var ls = await _iaLeadsDoMes(p.mes, p.ano, email);
+    ls.forEach(function(l){ var c = Object.assign({}, l); c._mes = p.mes; c._ano = p.ano; todos.push(c); });
+  }
+  return _iaAplicaFiltros(todos, f, per);
+}
+function _iaComissaoPeriodo(ls, per){
+  var proj = 0, real = 0, porCanal = {}, porServico = {}, porMes = {};
+  per.lista.forEach(function(p){
+    var doMes = ls.filter(function(l){ return l._mes === p.mes && l._ano === p.ano; });
+    var c = _iaComissaoMes(doMes);
+    proj += c.projecao.total; real += c.confirmada.total;
+    porMes[p.mes] = c;
+    Object.keys(c.projecao.porCanal).forEach(function(k){ porCanal[k] = (porCanal[k]||0) + c.projecao.porCanal[k]; });
+    Object.keys(c.projecao.porServico).forEach(function(k){ porServico[k] = (porServico[k]||0) + c.projecao.porServico[k]; });
+  });
+  return {proj:proj, real:real, porCanal:porCanal, porServico:porServico, porMes:porMes};
+}
+
+// ---- Ranking da equipe ----
+async function _iaEquipe(per, f, q){
+  var closers = _iaClosersConhecidos();
+  var linhas = [];
+  for(var i=0;i<closers.length;i++){
+    var ls = await _iaCarregar(per, f, closers[i].email);
+    var a = _iaAgrega(ls);
+    var com = _iaComissaoPeriodo(ls, per);
+    linhas.push({nome:closers[i].nome, a:a, com:com});
+  }
+  var porVenda = linhas.slice().sort(function(x,y){ return y.a.comb - x.a.comb; });
+  var porConv = linhas.slice().filter(function(l){ return l.a.qualif > 0; })
+                      .sort(function(x,y){ return _iaPct(y.a.vendidos,y.a.qualif) - _iaPct(x.a.vendidos,x.a.qualif); });
+  var porReuniao = linhas.slice().sort(function(x,y){ return y.a.inicial - x.a.inicial; });
+  var tabela = '<div class="ia-sub">Comparativo da equipe</div>'
+    + '<table class="ia-tabela"><thead><tr><th>Closer</th><th>Leads</th><th>Reuniões</th><th>Vendas</th>'
+    + '<th class="ia-num">Valor</th><th class="ia-num">Comissão</th><th class="ia-num">Conversão</th></tr></thead><tbody>'
+    + porVenda.map(function(l){
+        return '<tr><td>'+l.nome+'</td><td>'+l.a.qtd+'</td><td>'+l.a.inicial+'</td><td>'+l.a.vendidos+'</td>'
+          + '<td class="ia-num">'+_iaMoedaCurta(l.a.comb)+'</td>'
+          + '<td class="ia-num">'+_iaMoedaCurta(l.com.proj)+'</td>'
+          + '<td class="ia-num">'+_iaPct(l.a.vendidos, l.a.qualif).toFixed(1)+'%</td></tr>';
+      }).join('')
+    + '</tbody></table>';
+  var cards = [];
+  if(porVenda.length) cards.push({lbl:'Mais vendeu', val:porVenda[0].nome, sub:_iaMoeda(porVenda[0].a.comb), cor:'verde'});
+  if(porConv.length) cards.push({lbl:'Melhor conversão', val:porConv[0].nome, sub:_iaPct(porConv[0].a.vendidos, porConv[0].a.qualif).toFixed(1)+'%'});
+  if(porReuniao.length) cards.push({lbl:'Mais reuniões', val:porReuniao[0].nome, sub:porReuniao[0].a.inicial+' realizadas'});
+  cards.push({lbl:'Total da equipe', val:_iaMoedaCurta(linhas.reduce(function(s,l){ return s+l.a.comb; },0)), sub:'vendido'});
+  return _iaCards(cards) + tabela
+    + _iaBarras(porVenda.map(function(l){ return {nome:l.nome, valor:l.a.comb, sub:l.a.vendidos+' vendas'}; }));
+}
+
+// ---- Resposta principal ----
 async function _iaResponder(pergunta){
   var q = _iaNorm(pergunta);
   if(!q) return 'Pode perguntar algo como "quanto vendi em outubro".';
   if(!currentUser) return 'Faça login primeiro para eu conseguir ler os dados.';
 
   var per = _iaPeriodo(q);
+  var f = _iaFiltros(q);
   var alvo = _iaCloser(q);
-  var ls = await _iaLeadsDosMeses(per.meses, per.ano, alvo.email);
-  var a = _iaAgrega(ls);
-  var cab = _iaCab(per, alvo);
+  var cab = _iaCab(per, alvo, f);
+  var aviso = _iaAviso(f);
 
-  // Recorrencias / campanha
-  if(q.indexOf('recorrenc') >= 0 || q.indexOf('campanha') >= 0 || (q.indexOf('falta') >= 0 && q.indexOf('15') >= 0)){
+  // ---- Equipe / ranking ----
+  if(alvo.equipe){
+    if(!isAdmin) return cab + '<div class="ia-vazio">Só o admin consegue ver os dados da equipe.</div>';
+    return cab + aviso + (await _iaEquipe(per, f, q));
+  }
+
+  var ls = await _iaCarregar(per, f, alvo.email);
+  var a = _iaAgrega(ls);
+  var com = _iaComissaoPeriodo(ls, per);
+  per.lista.forEach(function(p){
+    if(!a.porMes[p.mes]) a.porMes[p.mes] = {leads:0, inicial:0, propostas:0, vendidos:0, comb:0, pago:0, rec:0};
+    a.porMes[p.mes].comissao = com.porMes[p.mes] ? com.porMes[p.mes].projecao.total : 0;
+  });
+  var mensal = per.multi ? _iaTabelaMeses(per, a.porMes) : '';
+  var dica = (per.semAno && per.multi === undefined) ? '' : '';
+
+  function fim(html){ return cab + aviso + html + mensal + dica; }
+
+  // ---- Comissoes ----
+  if(q.indexOf('comiss') >= 0 || q.indexOf('ganhei') >= 0 || q.indexOf('ganho') >= 0 || q.indexOf('remunerac') >= 0 || q.indexOf('bonificac') >= 0){
+    var porCanalCom = Object.keys(com.porCanal).map(function(k){ return {nome:k, valor:com.porCanal[k], sub:''}; })
+                            .sort(function(x,y){ return y.valor-x.valor; });
+    var porServCom = Object.keys(com.porServico).map(function(k){ return {nome:k, valor:com.porServico[k], sub:''}; })
+                           .sort(function(x,y){ return y.valor-x.valor; });
+    var detalhe = (q.indexOf('servico') >= 0 || q.indexOf('produto') >= 0) ? porServCom : porCanalCom;
+    var cm = per.lista.length === 1 ? com.porMes[per.lista[0].mes] : null;
+    var cards = [
+      {lbl:'Comissão projetada', val:_iaMoedaCurta(com.proj), sub:'se tudo for pago', cor:'laranja'},
+      {lbl:'Confirmada', val:_iaMoedaCurta(com.real), sub:'somente pagos', cor:'verde'},
+      {lbl:'Pendente', val:_iaMoedaCurta(Math.max(0, com.proj - com.real)), sub:'aguardando pagamento'},
+      {lbl:'Média por venda', val:_iaMoedaCurta(a.vendidos ? com.proj/a.vendidos : 0), sub:a.vendidos+' vendas'}
+    ];
+    var extra = '';
+    if(cm && !cm.gatilho) extra = '<div class="ia-aviso">⚠ Gatilho de '+_iaMoeda(PARAMS.totalMin)+' pagos ainda não atingido ('+_iaMoeda(cm.totalPago)+' pagos), por isso a comissão confirmada fica zerada.</div>';
+    return fim(_iaCards(cards) + extra
+      + '<div class="ia-sub">Comissão por '+((detalhe === porServCom) ? 'serviço' : 'canal')+'</div>'
+      + _iaBarras(detalhe));
+  }
+
+  // ---- Meta ----
+  if(q.indexOf('meta') >= 0 || (q.indexOf('falta') >= 0 && q.indexOf('recorrenc') < 0 && q.indexOf('power bi') < 0)){
+    var metaTot = (typeof META_PADRAO !== 'undefined' ? META_PADRAO : 125000) * per.lista.length;
+    var idealTot = (typeof META_IDEAL_PADRAO !== 'undefined' ? META_IDEAL_PADRAO : 150000) * per.lista.length;
+    var bateu = a.comb >= metaTot;
+    var ticket = a.vendidos ? a.comb/a.vendidos : 0;
+    var vendasFalt = (!bateu && ticket) ? Math.ceil((metaTot - a.comb)/ticket) : 0;
+    var convMedia = _iaPct(a.vendidos, a.inicial)/100;
+    var reunFalt = (!bateu && convMedia > 0) ? Math.ceil(vendasFalt/convMedia) : 0;
+    return fim(_iaCards([
+      {lbl:'Vendido', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios', cor:(bateu?'verde':'')},
+      {lbl:'Meta', val:_iaMoedaCurta(metaTot), sub:(bateu?'batida':'faltam '+_iaMoedaCurta(metaTot-a.comb)), cor:(bateu?'verde':'laranja')},
+      {lbl:'% da meta', val:Math.round(_iaPct(a.comb, metaTot))+'%', sub:'atingido'},
+      {lbl:'Meta ideal', val:_iaMoedaCurta(idealTot), sub:(a.comb>=idealTot?'batida':'faltam '+_iaMoedaCurta(idealTot-a.comb))}
+    ])
+    + _iaProgresso(a.comb, metaTot, _iaMoeda(a.comb)+' de '+_iaMoeda(metaTot))
+    + (!bateu && ticket ? '<div class="ia-nota">No seu ticket médio de '+_iaMoeda(ticket)+', faltam cerca de <b>'+vendasFalt+' vendas</b>'
+        + (reunFalt ? ' — o que daria por volta de <b>'+reunFalt+' reuniões</b> na sua conversão atual.' : '.') + '</div>' : ''));
+  }
+
+  // ---- Campanha recorrencias ----
+  if(q.indexOf('recorrenc') >= 0 || q.indexOf('campanha') >= 0){
     var faltam = Math.max(0, 15 - a.rec);
-    return cab + _iaCards([
+    return fim(_iaCards([
       {lbl:'Recorrências', val:a.rec, sub:'de 15 no trimestre', cor:(a.rec>=15?'verde':'laranja')},
       {lbl:'Já pagas', val:a.recPagas, sub:'confirmadas'},
+      {lbl:'MRR vendido', val:_iaMoedaCurta(a.mrr), sub:'serviço + BI'},
       {lbl:'Bônus', val:(a.rec>=15?'R$ 15.000':'R$ 0'), sub:(a.rec>=15?'garantido':'faltam '+faltam), cor:(a.rec>=15?'verde':'')}
-    ]) + _iaProgresso(a.rec, 15, a.rec+' de 15 recorrências');
+    ]) + _iaProgresso(a.rec, 15, a.rec+' de 15 recorrências'));
   }
 
-  // Power BI
+  // ---- Campanha Power BI / vendas de BI ----
   if(q.indexOf('power bi') >= 0 || /\bbi\b/.test(q)){
     var fbi = Math.max(0, 9 - a.bi);
-    return cab + _iaCards([
-      {lbl:'Power BI', val:a.bi, sub:'de 9 no trimestre', cor:(a.bi>=9?'verde':'laranja')},
-      {lbl:'MRR de BI', val:_iaMoedaCurta(a.mrrBi), sub:'vendido'},
+    return fim(_iaCards([
+      {lbl:'Power BI vendidos', val:a.bi, sub:'de 9 no trimestre', cor:(a.bi>=9?'verde':'laranja')},
+      {lbl:'MRR de BI', val:_iaMoedaCurta(a.mrrBi), sub:'recorrente'},
+      {lbl:'Pagos', val:a.biPagos, sub:'confirmados'},
       {lbl:'Bônus', val:(a.bi>=9?'R$ 5.000':'R$ 0'), sub:(a.bi>=9?'garantido':'faltam '+fbi), cor:(a.bi>=9?'verde':'')}
-    ]) + _iaProgresso(a.bi, 9, a.bi+' de 9 Power BI');
+    ]) + _iaProgresso(a.bi, 9, a.bi+' de 9 Power BI'));
   }
 
-  // A receber
-  if((q.indexOf('nao pago') >= 0 || q.indexOf('receber') >= 0 || q.indexOf('pendente') >= 0 || q.indexOf('em aberto') >= 0 || q.indexOf('atraso') >= 0)
-     && q.indexOf('quanto ja') < 0 && q.indexOf('comiss') < 0){
-    return cab + _iaCards([
-      {lbl:'Em aberto', val:_iaMoedaCurta(a.comb - a.pago), sub:a.listaAberto.length+' leads', cor:'laranja'},
-      {lbl:'Já pago', val:_iaMoedaCurta(a.pago), sub:'confirmado', cor:'verde'},
+  // ---- Tempo medio entre etapas ----
+  if(q.indexOf('tempo medio') >= 0 || q.indexOf('quanto tempo') >= 0 || q.indexOf('ciclo') >= 0){
+    var t1 = _iaMedia(a.temposLeadReuniao), t2 = _iaMedia(a.temposReuniaoProposta), t3 = _iaMedia(a.temposLeadVenda);
+    return fim(_iaCards([
+      {lbl:'Lead → reunião', val:(t1===null?'—':t1.toFixed(1)+' dias'), sub:a.temposLeadReuniao.length+' casos'},
+      {lbl:'Reunião → proposta', val:(t2===null?'—':t2.toFixed(1)+' dias'), sub:a.temposReuniaoProposta.length+' casos'},
+      {lbl:'Lead → venda', val:(t3===null?'—':t3.toFixed(1)+' dias'), sub:a.temposLeadVenda.length+' casos', cor:'verde'}
+    ]) + '<div class="ia-nota">Calculado só com os leads que têm as duas datas preenchidas.</div>');
+  }
+
+  // ---- SDR ----
+  if((/\bsdr\b/.test(q) && (q.indexOf('qual') >= 0 || q.indexOf('quais') >= 0 || q.indexOf('ranking') >= 0
+      || q.indexOf('melhor') >= 0 || q.indexOf('mais') >= 0 || q.indexOf('por sdr') >= 0 || q.indexOf('cada sdr') >= 0
+      || q.indexOf('desempenho') >= 0)) || q.indexOf('originou') >= 0){
+    var rankSdr = _iaRank(a.sdrs, 'vendidos');
+    return fim(_iaCards([
+      {lbl:'SDR com mais vendas', val:(rankSdr[0]?rankSdr[0].nome:'—'), sub:((rankSdr[0]||{}).valor||0)+' vendas', cor:'verde'},
+      {lbl:'Reuniões por SDR', val:(_iaRank(a.sdrs,'inicial')[0]||{}).nome||'—', sub:((_iaRank(a.sdrs,'inicial')[0]||{}).valor||0)+' realizadas'},
       {lbl:'Total vendido', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios'}
-    ]) + _iaLista(a.listaAberto);
+    ])
+    + '<div class="ia-sub">Reuniões realizadas por SDR</div>'
+    + _iaBarras(_iaRank(a.sdrs,'inicial').map(function(i){ return {nome:i.nome, valor:i.valor, sub:'reuniões'}; }), 'num')
+    + '<div class="ia-sub">Valor vendido por SDR</div>' + _iaBarras(_iaRank(a.sdrs,'valor')));
   }
 
-  // Pago
-  if(q.indexOf('pago') >= 0 || q.indexOf('recebi') >= 0 || q.indexOf('confirmad') >= 0 || q.indexOf('entrou') >= 0){
-    return cab + _iaCards([
-      {lbl:'Pago', val:_iaMoedaCurta(a.pago), sub:'confirmado', cor:'verde'},
-      {lbl:'A receber', val:_iaMoedaCurta(a.comb - a.pago), sub:a.listaAberto.length+' leads', cor:'laranja'},
-      {lbl:'% recebido', val:(a.comb?Math.round(a.pago/a.comb*100):0)+'%', sub:'do vendido'}
-    ]) + _iaProgresso(a.pago, a.comb || 1, _iaMoeda(a.pago)+' de '+_iaMoeda(a.comb));
-  }
-
-  // Meta
-  if(q.indexOf('meta') >= 0 || (q.indexOf('falta') >= 0 && q.indexOf('recorr') < 0)){
-    var metaMes = (typeof META_PADRAO !== 'undefined' ? META_PADRAO : 125000) * per.meses.length;
-    var idealMes = (typeof META_IDEAL_PADRAO !== 'undefined' ? META_IDEAL_PADRAO : 150000) * per.meses.length;
-    var bateu = a.comb >= metaMes;
-    return cab + _iaCards([
-      {lbl:'Vendido', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios', cor:(bateu?'verde':'')},
-      {lbl:'Meta', val:_iaMoedaCurta(metaMes), sub:(bateu?'batida':'faltam '+_iaMoedaCurta(metaMes-a.comb)), cor:(bateu?'verde':'laranja')},
-      {lbl:'Meta ideal', val:_iaMoedaCurta(idealMes), sub:(a.comb>=idealMes?'batida':'faltam '+_iaMoedaCurta(idealMes-a.comb))}
-    ]) + _iaProgresso(a.comb, metaMes, _iaMoeda(a.comb)+' de '+_iaMoeda(metaMes));
-  }
-
-  // Canais
-  if(q.indexOf('canal') >= 0 || q.indexOf('canais') >= 0 || q.indexOf('origem') >= 0){
-    var arr = Object.keys(a.canais).map(function(c){ return {nome:c, valor:a.canais[c].valor, sub:a.canais[c].qtd+' vendas'}; })
-                    .sort(function(x,y){ return y.valor-x.valor; });
-    if(!arr.length) return cab + '<div class="ia-vazio">Nenhuma venda nesse período.</div>';
-    return cab + _iaCards([
-      {lbl:'Melhor canal', val:arr[0].nome, sub:_iaMoeda(arr[0].valor), cor:'verde'},
-      {lbl:'Canais ativos', val:arr.length, sub:'com venda'},
-      {lbl:'Total', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios'}
-    ]) + _iaBarras(arr);
-  }
-
-  // Reunioes
-  if(q.indexOf('reuni') >= 0 || q.indexOf('no-show') >= 0 || q.indexOf('no show') >= 0 || q.indexOf('agenda') >= 0){
-    var tx = (a.inicial + a.noshow) ? Math.round(a.inicial/(a.inicial+a.noshow)*100) : 0;
-    return cab + _iaCards([
+  // ---- Reunioes ----
+  if(q.indexOf('reuni') >= 0 || q.indexOf('no-show') >= 0 || q.indexOf('no show') >= 0 || q.indexOf('agendad') >= 0
+     || q.indexOf('cancelad') >= 0 || q.indexOf('inicial') >= 0 || q.indexOf('inicias') >= 0){
+    var compar = _iaPct(a.inicial, a.inicial + a.noshow);
+    var mediaDia = a.inicial / (per.lista.length * 21);
+    return fim(_iaCards([
       {lbl:'Realizadas', val:a.inicial, sub:'reuniões iniciais', cor:'verde'},
+      {lbl:'Agendadas', val:a.agendadas, sub:'no período'},
       {lbl:'No-shows', val:a.noshow, sub:'não compareceram', cor:'laranja'},
-      {lbl:'Comparecimento', val:tx+'%', sub:'das agendadas'},
-      {lbl:'Leads', val:a.qtd, sub:'no período'}
-    ]);
+      {lbl:'Canceladas', val:a.cancel, sub:'ou remarcadas'},
+      {lbl:'Comparecimento', val:compar.toFixed(0)+'%', sub:'das realizadas + no-show'},
+      {lbl:'Avançaram', val:a.avancou, sub:'para proposta'}
+    ])
+    + '<div class="ia-nota">Média de <b>'+mediaDia.toFixed(1)+' reuniões por dia útil</b> (base de 21 dias/mês). '
+    + 'Conversão de reunião para proposta: <b>'+_iaPct(a.propostas, a.inicial).toFixed(1)+'%</b>.</div>'
+    + _iaBarras(_iaRank(a.canais,'inicial').map(function(i){ return {nome:i.nome, valor:i.valor, sub:'reuniões'}; }), 'num'));
   }
 
-  // Conversao
+  // ---- Propostas ----
+  if(q.indexOf('proposta') >= 0){
+    var valProp = a.listaVend.reduce(function(s,i){ return s+i.valor; },0);
+    return fim(_iaCards([
+      {lbl:'Propostas', val:a.propostas, sub:'apresentadas', cor:'laranja'},
+      {lbl:'Viraram venda', val:a.vendidos, sub:_iaPct(a.vendidos, a.propostas).toFixed(1)+'% de conversão', cor:'verde'},
+      {lbl:'Em negociação', val:a.negociacao, sub:'ainda abertas'},
+      {lbl:'Perdidas', val:a.perdidos, sub:'não convertidas'}
+    ])
+    + '<div class="ia-sub">Propostas por serviço</div>'
+    + _iaBarras(_iaRank(a.servicos,'propostas').map(function(i){ return {nome:i.nome, valor:i.valor, sub:'propostas'}; }), 'num'));
+  }
+
+  // ---- Leads / funil ----
+  if(/\bquantos? leads?\b/.test(q) || /\bquantidade de leads?\b/.test(q)
+     || /\bleads? (recebi|entraram|tenho|tive|peguei|chegaram|vieram)\b/.test(q)
+     || q.indexOf('funil') >= 0 || q.indexOf('pipeline') >= 0 || /\btotal de leads?\b/.test(q)
+     || q.indexOf('perdido') >= 0 || q.indexOf('negociacao') >= 0){
+    var etapas = [
+      {nome:'Leads', valor:a.qtd},
+      {nome:'Qualificados', valor:a.qualif},
+      {nome:'Reuniões', valor:a.inicial},
+      {nome:'Propostas', valor:a.propostas},
+      {nome:'Vendas', valor:a.vendidos}
+    ];
+    return fim(_iaCards([
+      {lbl:'Leads', val:a.qtd, sub:'no período', cor:'laranja'},
+      {lbl:'Qualificados', val:a.qualif, sub:Math.round(_iaPct(a.qualif,a.qtd))+'% do total'},
+      {lbl:'Em negociação', val:a.negociacao, sub:'abertos'},
+      {lbl:'Perdidos', val:a.perdidos, sub:'não convertidos'},
+      {lbl:'Vendidos', val:a.vendidos, sub:_iaMoedaCurta(a.comb), cor:'verde'}
+    ])
+    + '<div class="ia-sub">Funil por etapa</div>' + _iaBarras(etapas, 'num')
+    + '<div class="ia-sub">Leads por canal</div>'
+    + _iaBarras(_iaRank(a.canais,'leads').map(function(i){ return {nome:i.nome, valor:i.valor, sub:'leads'}; }), 'num'));
+  }
+
+  // ---- Conversao ----
   if(q.indexOf('convers') >= 0 || q.indexOf('taxa') >= 0){
-    var conv = a.qualif ? (a.vendidos/a.qualif*100) : 0;
-    return cab + _iaCards([
-      {lbl:'Conversão', val:conv.toFixed(1)+'%', sub:'vendas / qualificados', cor:'verde'},
-      {lbl:'Vendas', val:a.vendidos, sub:'fechadas'},
-      {lbl:'Qualificados', val:a.qualif, sub:'no funil'},
-      {lbl:'Ticket médio', val:_iaMoedaCurta(a.vendidos?a.comb/a.vendidos:0), sub:'por venda'}
-    ]);
+    return fim(_iaCards([
+      {lbl:'Lead → reunião', val:_iaPct(a.inicial, a.qtd).toFixed(1)+'%', sub:a.inicial+' de '+a.qtd},
+      {lbl:'Reunião → proposta', val:_iaPct(a.propostas, a.inicial).toFixed(1)+'%', sub:a.propostas+' de '+a.inicial},
+      {lbl:'Proposta → venda', val:_iaPct(a.vendidos, a.propostas).toFixed(1)+'%', sub:a.vendidos+' de '+a.propostas, cor:'verde'},
+      {lbl:'Qualificado → venda', val:_iaPct(a.vendidos, a.qualif).toFixed(1)+'%', sub:a.vendidos+' de '+a.qualif},
+      {lbl:'Lead → venda', val:_iaPct(a.vendidos, a.qtd).toFixed(1)+'%', sub:'conversão geral'}
+    ])
+    + '<div class="ia-sub">Conversão por canal (venda / lead)</div>'
+    + _iaBarras(Object.keys(a.canais).map(function(k){
+        return {nome:k, valor:Math.round(_iaPct(a.canais[k].vendidos, a.canais[k].leads)), sub:a.canais[k].vendidos+'/'+a.canais[k].leads};
+      }), 'num'));
   }
 
-  // Ticket
+  // ---- Ticket ----
   if(q.indexOf('ticket') >= 0 || q.indexOf('media por venda') >= 0){
-    return cab + _iaCards([
+    return fim(_iaCards([
       {lbl:'Ticket médio', val:_iaMoeda(a.vendidos?a.comb/a.vendidos:0), sub:a.vendidos+' vendas', cor:'verde'},
+      {lbl:'Ticket MRR', val:_iaMoeda(a.rec?a.mrr/a.rec:0), sub:'por recorrência'},
       {lbl:'Maior venda', val:_iaMoedaCurta(a.listaVend.length?a.listaVend[0].valor:0), sub:(a.listaVend.length?a.listaVend[0].emp:'—')},
       {lbl:'Total', val:_iaMoedaCurta(a.comb), sub:'no período'}
-    ]) + _iaLista(a.listaVend, 5);
+    ]) + _iaLista(a.listaVend, 5));
   }
 
-  // Comissao
-  if(q.indexOf('comiss') >= 0 || q.indexOf('ganhar') >= 0 || q.indexOf('ganho') >= 0){
-    var proj = document.getElementById('total-proj');
-    var real = document.getElementById('total-real');
-    if(per.atual && !alvo.outro && proj && real){
-      return cab + _iaCards([
-        {lbl:'Projeção total', val:proj.textContent, sub:'se tudo for pago', cor:'laranja'},
-        {lbl:'Confirmada', val:real.textContent, sub:'somente pagos', cor:'verde'}
-      ]) + '<div class="ia-dim" style="margin-top:10px">Abertura completa por canal está na aba Comissão.</div>';
-    }
-    return cab + _iaCards([
-      {lbl:'Vendido', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios'},
-      {lbl:'Pago', val:_iaMoedaCurta(a.pago), sub:'confirmado', cor:'verde'}
-    ]) + '<div class="ia-dim" style="margin-top:10px">A comissão detalhada eu calculo apenas para o mês aberto na tela.</div>';
+  // ---- A receber ----
+  if((q.indexOf('nao pago') >= 0 || q.indexOf('a receber') >= 0 || q.indexOf('pendente') >= 0 || q.indexOf('em aberto') >= 0 || q.indexOf('atraso') >= 0)
+     && q.indexOf('lead') < 0){
+    return fim(_iaCards([
+      {lbl:'Em aberto', val:_iaMoedaCurta(a.comb - a.pago), sub:a.listaAberto.length+' leads', cor:'laranja'},
+      {lbl:'Já pago', val:_iaMoedaCurta(a.pago), sub:'confirmado', cor:'verde'},
+      {lbl:'Total vendido', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios'},
+      {lbl:'Comissão pendente', val:_iaMoedaCurta(Math.max(0, com.proj - com.real)), sub:'aguardando'}
+    ]) + _iaLista(a.listaAberto));
   }
 
-  // Comparativo por mes
-  if(per.meses.length > 1 && (q.indexOf('compar') >= 0 || q.indexOf('por mes') >= 0 || q.indexOf('evolu') >= 0)){
-    var mm = per.meses.map(function(m){
-      var d = a.porMes[m] || {comb:0, vendidos:0};
-      return {nome:m, valor:d.comb, sub:d.vendidos+' vendas'};
+  // ---- Pago ----
+  if((q.indexOf('pago') >= 0 || q.indexOf('recebi') >= 0 || q.indexOf('confirmad') >= 0 || q.indexOf('entrou') >= 0)
+     && q.indexOf('lead') < 0 && q.indexOf('reuni') < 0){
+    return fim(_iaCards([
+      {lbl:'Pago', val:_iaMoedaCurta(a.pago), sub:'confirmado', cor:'verde'},
+      {lbl:'A receber', val:_iaMoedaCurta(a.comb - a.pago), sub:a.listaAberto.length+' leads', cor:'laranja'},
+      {lbl:'% recebido', val:Math.round(_iaPct(a.pago, a.comb))+'%', sub:'do vendido'},
+      {lbl:'Comissão confirmada', val:_iaMoedaCurta(com.real), sub:'somente pagos'}
+    ]) + _iaProgresso(a.pago, a.comb || 1, _iaMoeda(a.pago)+' de '+_iaMoeda(a.comb)));
+  }
+
+  // ---- Canais ----
+  if(q.indexOf('canal') >= 0 || q.indexOf('canais') >= 0 || q.indexOf('origem') >= 0){
+    var rankVal = _iaRank(a.canais, 'valor');
+    if(!rankVal.filter(function(i){return i.valor>0;}).length && !a.qtd)
+      return fim('<div class="ia-vazio">Nenhum dado nesse período.</div>');
+    return fim(_iaCards([
+      {lbl:'Melhor em valor', val:(rankVal[0]?rankVal[0].nome:'—'), sub:(rankVal[0]?_iaMoeda(rankVal[0].valor):''), cor:'verde'},
+      {lbl:'Mais leads', val:(_iaRank(a.canais,'leads')[0]||{}).nome||'—', sub:((_iaRank(a.canais,'leads')[0]||{}).valor||0)+' leads'},
+      {lbl:'Mais reuniões', val:(_iaRank(a.canais,'inicial')[0]||{}).nome||'—', sub:((_iaRank(a.canais,'inicial')[0]||{}).valor||0)+' reuniões'},
+      {lbl:'Total', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' vendas'}
+    ])
+    + '<div class="ia-sub">Faturamento por canal</div>' + _iaBarras(rankVal)
+    + '<div class="ia-sub">Comissão por canal</div>'
+    + _iaBarras(Object.keys(com.porCanal).map(function(k){ return {nome:k, valor:com.porCanal[k], sub:''}; })
+                .sort(function(x,y){ return y.valor-x.valor; }))
+    + '<div class="ia-sub">Conversão por canal</div>'
+    + _iaBarras(Object.keys(a.canais).map(function(k){
+        return {nome:k, valor:Math.round(_iaPct(a.canais[k].vendidos, a.canais[k].leads)), sub:a.canais[k].vendidos+'/'+a.canais[k].leads};
+      }), 'num'));
+  }
+
+  // ---- Servicos / produtos ----
+  if(q.indexOf('servico') >= 0 || q.indexOf('produto') >= 0 || f.servicos.length
+     || q.indexOf('assessoria') >= 0 || q.indexOf('diagnostico') >= 0 || q.indexOf('marketing') >= 0 || q.indexOf('site') >= 0){
+    var rankSv = _iaRank(a.servicos, 'valor');
+    return fim(_iaCards([
+      {lbl:'Mais vendido', val:(rankSv[0]?rankSv[0].nome:'—'), sub:(rankSv[0]?_iaMoeda(rankSv[0].valor):''), cor:'verde'},
+      {lbl:'Serviços vendidos', val:rankSv.filter(function(i){return i.valor>0;}).length, sub:'tipos diferentes'},
+      {lbl:'Total', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' vendas'},
+      {lbl:'MRR', val:_iaMoedaCurta(a.mrr), sub:'recorrente'}
+    ])
+    + '<div class="ia-sub">Faturamento por serviço</div>' + _iaBarras(rankSv)
+    + _iaLista(a.listaVend, 8));
+  }
+
+  // ---- Evolucao / comparativo ----
+  if(q.indexOf('compar') >= 0 || q.indexOf('evolu') >= 0 || q.indexOf('melhor mes') >= 0 || q.indexOf('melhor trimestre') >= 0
+     || q.indexOf('cresceu') >= 0 || q.indexOf('melhorou') >= 0 || q.indexOf('piorou') >= 0 || per.multi){
+    var serie = per.lista.map(function(p){
+      var d = a.porMes[p.mes] || {comb:0, vendidos:0};
+      return {nome:p.mes, valor:d.comb, sub:d.vendidos+' vendas'};
     });
-    return cab + _iaCards([
+    var melhor = serie.slice().sort(function(x,y){ return y.valor-x.valor; })[0];
+    var variacao = '';
+    if(serie.length >= 2){
+      var ult = serie[serie.length-1].valor, pen = serie[serie.length-2].valor;
+      var dif = ult - pen;
+      var pctv = pen ? (dif/pen*100) : 0;
+      variacao = '<div class="ia-nota">Do penúltimo para o último mês: <b class="'+(dif>=0?'ia-ok':'ia-bad')+'">'
+        + (dif>=0?'+':'')+_iaMoeda(dif)+' ('+(dif>=0?'+':'')+pctv.toFixed(1)+'%)</b>.</div>';
+    }
+    return fim(_iaCards([
       {lbl:'Total', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios', cor:'verde'},
-      {lbl:'Média/mês', val:_iaMoedaCurta(a.comb/per.meses.length), sub:'no período'}
-    ]) + _iaBarras(mm);
+      {lbl:'Média/mês', val:_iaMoedaCurta(a.comb/per.lista.length), sub:per.lista.length+' meses'},
+      {lbl:'Melhor mês', val:(melhor?melhor.nome:'—'), sub:(melhor?_iaMoeda(melhor.valor):'')},
+      {lbl:'Comissão', val:_iaMoedaCurta(com.proj), sub:'projetada'}
+    ]) + '<div class="ia-sub">Evolução mês a mês</div>' + _iaBarras(serie) + variacao);
   }
 
-  // Vendas (padrao)
-  if(q.indexOf('vend') >= 0 || q.indexOf('faturamento') >= 0 || q.indexOf('quanto') >= 0 ||
-     q.indexOf('total') >= 0 || q.indexOf('lead') >= 0 || q.indexOf('resumo') >= 0 || q.indexOf('como estou') >= 0){
-    var resp = cab + _iaCards([
+  // ---- Vendas (padrao) ----
+  if(q.indexOf('vend') >= 0 || q.indexOf('faturamento') >= 0 || q.indexOf('quanto') >= 0 || q.indexOf('total') >= 0
+     || q.indexOf('resumo') >= 0 || q.indexOf('como estou') >= 0 || q.indexOf('mrr') >= 0 || q.indexOf('implantac') >= 0
+     || q.indexOf('performance') >= 0 || q.indexOf('resultado') >= 0){
+    return fim(_iaCards([
       {lbl:'Vendido', val:_iaMoedaCurta(a.comb), sub:a.vendidos+' negócios', cor:'verde'},
       {lbl:'Pago', val:_iaMoedaCurta(a.pago), sub:'confirmado'},
-      {lbl:'Recorrências', val:a.rec, sub:'com MRR'},
+      {lbl:'MRR', val:_iaMoedaCurta(a.mrr), sub:a.rec+' recorrências'},
+      {lbl:'Implantação', val:_iaMoedaCurta(a.impl), sub:'não comissiona'},
+      {lbl:'Comissão', val:_iaMoedaCurta(com.proj), sub:'projetada'},
       {lbl:'Ticket médio', val:_iaMoedaCurta(a.vendidos?a.comb/a.vendidos:0), sub:'por venda'}
-    ]);
-    if(per.meses.length > 1){
-      var mm2 = per.meses.map(function(m){
-        var d = a.porMes[m] || {comb:0, vendidos:0};
-        return {nome:m, valor:d.comb, sub:d.vendidos+' vendas'};
-      });
-      resp += _iaBarras(mm2);
-    }
-    return resp + _iaLista(a.listaVend);
+    ]) + _iaLista(a.listaVend));
   }
 
-  return '<div class="ia-vazio">Não entendi essa pergunta.</div>'
-    + '<div class="ia-dim" style="margin-top:8px">Tente algo como: <b>quanto vendi em outubro</b>, <b>quantas recorrências faltam</b>, <b>o que está em aberto</b>, <b>qual canal mais vendeu</b>, <b>minha conversão no trimestre</b>.</div>';
+  return cab + aviso + '<div class="ia-vazio">Não entendi essa pergunta.</div>'
+    + '<div class="ia-nota">Tente algo como: <b>quantas reuniões iniciais fiz em setembro</b>, <b>quanto ganhei de comissão por canal no trimestre</b>, '
+    + '<b>qual minha conversão de proposta para venda</b>, <b>compare minhas vendas dos últimos seis meses</b> ou <b>quem vendeu mais na equipe</b>.</div>';
 }
 
 // ---- Interface ----
@@ -5920,76 +6347,87 @@ function _iaMontarUI(){
   + '#ia-fab{position:fixed;right:26px;bottom:26px;z-index:9998;cursor:pointer;border:none;display:none;'
   + 'align-items:center;gap:9px;background:linear-gradient(135deg,#ff6b00,#ff9940);color:#fff;font-weight:700;'
   + 'font-size:15px;padding:15px 24px;border-radius:40px;box-shadow:0 10px 30px rgba(255,107,0,.4);font-family:Inter,sans-serif}'
-  + '#ia-fab:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(255,107,0,.5)}'
-  + '#ia-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,6,20,.78);display:none;align-items:center;'
-  + 'justify-content:center;padding:28px;font-family:Inter,sans-serif}'
-  + '#ia-box{width:100%;max-width:1040px;height:88vh;background:#15092b;border:.5px solid rgba(255,255,255,.12);'
+  + '#ia-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,6,20,.8);display:none;align-items:center;'
+  + 'justify-content:center;padding:26px;font-family:Inter,sans-serif}'
+  + '#ia-box{width:100%;max-width:1120px;height:90vh;background:#15092b;border:.5px solid rgba(255,255,255,.12);'
   + 'border-radius:20px;display:flex;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}'
-  + '#ia-side{width:252px;flex-shrink:0;background:rgba(255,255,255,.03);border-right:.5px solid rgba(255,255,255,.08);'
-  + 'padding:22px 18px;overflow:auto}'
-  + '#ia-side h4{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin:18px 0 8px;font-weight:700}'
+  + '#ia-side{width:262px;flex-shrink:0;background:rgba(255,255,255,.03);border-right:.5px solid rgba(255,255,255,.08);'
+  + 'padding:20px 16px;overflow:auto}'
+  + '#ia-side h4{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin:16px 0 6px;font-weight:700}'
   + '#ia-side h4:first-child{margin-top:0}'
   + '#ia-side button{display:block;width:100%;text-align:left;cursor:pointer;background:transparent;border:none;'
-  + 'color:rgba(255,255,255,.72);font-size:13px;padding:8px 10px;border-radius:8px;font-family:Inter,sans-serif;margin-bottom:2px}'
+  + 'color:rgba(255,255,255,.72);font-size:12.5px;padding:7px 10px;border-radius:8px;font-family:Inter,sans-serif;margin-bottom:1px}'
   + '#ia-side button:hover{background:rgba(255,107,0,.14);color:#ff9940}'
   + '#ia-main{flex:1;display:flex;flex-direction:column;min-width:0}'
-  + '#ia-head{padding:20px 26px;border-bottom:.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center}'
+  + '#ia-head{padding:18px 24px;border-bottom:.5px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center}'
   + '#ia-head .ia-t{font-size:17px;font-weight:800;color:#fff}'
   + '#ia-head .ia-s{font-size:12px;color:rgba(255,255,255,.4);margin-top:2px}'
-  + '#ia-msgs{flex:1;overflow:auto;padding:24px 26px;display:flex;flex-direction:column;gap:18px}'
-  + '#ia-empty{margin:auto;text-align:center;color:rgba(255,255,255,.35);font-size:14px;max-width:420px;line-height:1.7}'
+  + '#ia-msgs{flex:1;overflow:auto;padding:22px 24px;display:flex;flex-direction:column;gap:16px}'
+  + '#ia-empty{margin:auto;text-align:center;color:rgba(255,255,255,.35);font-size:14px;max-width:460px;line-height:1.7}'
   + '#ia-empty .ia-big{font-size:46px;margin-bottom:10px}'
-  + '.ia-msg{font-size:14px;line-height:1.55;max-width:88%}'
+  + '.ia-msg{font-size:14px;line-height:1.55;max-width:92%}'
   + '.ia-user{align-self:flex-end;background:linear-gradient(135deg,#ff6b00,#ff8c3a);color:#fff;padding:11px 16px;'
-  + 'border-radius:16px 16px 4px 16px;font-weight:500;box-shadow:0 4px 14px rgba(255,107,0,.25)}'
+  + 'border-radius:16px 16px 4px 16px;font-weight:500}'
   + '.ia-bot{align-self:flex-start;background:rgba(255,255,255,.045);border:.5px solid rgba(255,255,255,.07);'
   + 'color:rgba(255,255,255,.92);padding:18px 20px;border-radius:16px 16px 16px 4px;width:100%;box-sizing:border-box}'
   + '.ia-dim{color:rgba(255,255,255,.42);font-size:12px}'
   + '.ia-vazio{color:rgba(255,255,255,.45);font-size:13px}'
-  + '.ia-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}'
+  + '.ia-ok{color:#1baf7a;font-weight:700}.ia-bad{color:#e34948;font-weight:700}'
+  + '.ia-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}'
   + '.ia-chip{font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;color:#ff9940;'
   + 'background:rgba(255,107,0,.12);border:.5px solid rgba(255,107,0,.25);padding:4px 11px;border-radius:20px}'
-  + '.ia-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin-bottom:14px}'
-  + '.ia-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:12px;padding:13px 15px}'
+  + '.ia-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:9px;margin-bottom:12px}'
+  + '.ia-card{background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px}'
   + '.ia-card-verde{background:rgba(27,175,122,.1);border-color:rgba(27,175,122,.3)}'
   + '.ia-card-laranja{background:rgba(255,107,0,.08);border-color:rgba(255,107,0,.25)}'
-  + '.ia-card-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.4);font-weight:700}'
-  + '.ia-card-val{font-size:23px;font-weight:800;color:#fff;margin-top:5px;line-height:1.1}'
+  + '.ia-card-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.4);font-weight:700}'
+  + '.ia-card-val{font-size:21px;font-weight:800;color:#fff;margin-top:4px;line-height:1.15}'
   + '.ia-card-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:3px}'
-  + '.ia-card-verde .ia-card-val{color:#1baf7a}'
-  + '.ia-card-laranja .ia-card-val{color:#ff9940}'
-  + '.ia-prog-wrap{margin:14px 0 4px}'
+  + '.ia-card-verde .ia-card-val{color:#1baf7a}.ia-card-laranja .ia-card-val{color:#ff9940}'
+  + '.ia-sub{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);'
+  + 'font-weight:700;margin:16px 0 8px}'
+  + '.ia-prog-wrap{margin:12px 0 4px}'
   + '.ia-prog{background:rgba(255,255,255,.07);border-radius:10px;height:9px;overflow:hidden}'
   + '.ia-prog-in{height:9px;border-radius:10px;background:linear-gradient(90deg,#ff6b00,#ff9940)}'
   + '.ia-prog-in.ok{background:linear-gradient(90deg,#1baf7a,#30d99b)}'
   + '.ia-prog-txt{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.45);margin-top:6px}'
-  + '.ia-ok{color:#1baf7a;font-weight:700}'
-  + '.ia-barras{margin-top:12px;display:flex;flex-direction:column;gap:9px}'
-  + '.ia-barra-row{display:flex;align-items:center;gap:11px;font-size:12px}'
-  + '.ia-barra-lbl{width:88px;flex-shrink:0;color:rgba(255,255,255,.75)}'
-  + '.ia-barra-trk{flex:1;background:rgba(255,255,255,.06);border-radius:8px;height:18px;overflow:hidden}'
-  + '.ia-barra-in{height:18px;border-radius:8px;background:linear-gradient(90deg,rgba(255,107,0,.85),rgba(255,153,64,.85))}'
-  + '.ia-barra-val{width:120px;text-align:right;color:#fff;font-weight:700;white-space:nowrap}'
-  + '.ia-lista{margin-top:12px;border-top:.5px solid rgba(255,255,255,.07)}'
-  + '.ia-lin{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;'
+  + '.ia-barras{display:flex;flex-direction:column;gap:8px}'
+  + '.ia-barra-row{display:flex;align-items:center;gap:10px;font-size:12px}'
+  + '.ia-barra-lbl{width:120px;flex-shrink:0;color:rgba(255,255,255,.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.ia-barra-trk{flex:1;background:rgba(255,255,255,.06);border-radius:8px;height:17px;overflow:hidden}'
+  + '.ia-barra-in{height:17px;border-radius:8px;background:linear-gradient(90deg,rgba(255,107,0,.85),rgba(255,153,64,.85))}'
+  + '.ia-barra-val{width:130px;text-align:right;color:#fff;font-weight:700;white-space:nowrap}'
+  + '.ia-tabela{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}'
+  + '.ia-tabela th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;'
+  + 'color:rgba(255,255,255,.4);padding:6px 8px;border-bottom:.5px solid rgba(255,255,255,.12)}'
+  + '.ia-tabela td{padding:7px 8px;border-bottom:.5px solid rgba(255,255,255,.05);color:rgba(255,255,255,.85)}'
+  + '.ia-tabela .ia-num{text-align:right}'
+  + '.ia-tabela tfoot td{font-weight:800;color:#ff9940;border-top:.5px solid rgba(255,255,255,.15);border-bottom:none}'
+  + '.ia-lista{margin-top:10px;border-top:.5px solid rgba(255,255,255,.07)}'
+  + '.ia-lin{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;'
   + 'border-bottom:.5px solid rgba(255,255,255,.05)}'
   + '.ia-lin-emp{font-size:13px;color:#fff;font-weight:500}'
   + '.ia-lin-dir{text-align:right;font-size:13px;color:#fff;font-weight:700;white-space:nowrap}'
   + '.ia-tag{font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;margin-top:3px;display:inline-block}'
   + '.ia-tag-ok{background:rgba(27,175,122,.18);color:#1baf7a}'
   + '.ia-tag-pend{background:rgba(255,107,0,.15);color:#ff9940}'
+  + '.ia-nota{margin-top:12px;font-size:12.5px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.03);'
+  + 'border-left:2px solid rgba(255,107,0,.5);padding:9px 12px;border-radius:0 8px 8px 0}'
+  + '.ia-aviso{margin:10px 0;font-size:12px;color:#ffb46b;background:rgba(255,107,0,.08);'
+  + 'border:.5px solid rgba(255,107,0,.25);padding:9px 12px;border-radius:8px}'
   + '.ia-load{display:inline-flex;gap:5px}'
   + '.ia-load i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);animation:iapulse 1s infinite}'
   + '.ia-load i:nth-child(2){animation-delay:.15s}.ia-load i:nth-child(3){animation-delay:.3s}'
   + '@keyframes iapulse{0%,100%{opacity:.25}50%{opacity:1}}'
-  + '#ia-foot{padding:18px 26px;border-top:.5px solid rgba(255,255,255,.08);display:flex;gap:10px}'
+  + '#ia-foot{padding:16px 24px;border-top:.5px solid rgba(255,255,255,.08);display:flex;gap:10px}'
   + '#ia-foot input{flex:1;background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.14);border-radius:12px;'
   + 'padding:14px 16px;color:#fff;font-size:14px;outline:none;font-family:Inter,sans-serif}'
   + '#ia-foot input:focus{border-color:rgba(255,107,0,.5)}'
   + '#ia-foot button{cursor:pointer;background:linear-gradient(135deg,#ff6b00,#ff9940);border:none;color:#fff;'
   + 'font-weight:700;border-radius:12px;padding:0 26px;font-size:14px;font-family:Inter,sans-serif}'
-  + '@media(max-width:860px){#ia-side{display:none}#ia-overlay{padding:0}#ia-box{height:100vh;border-radius:0}'
-  + '.ia-msg{max-width:100%}.ia-barra-lbl{width:70px}.ia-barra-val{width:88px}}';
+  + '@media(max-width:900px){#ia-side{display:none}#ia-overlay{padding:0}#ia-box{height:100vh;border-radius:0}'
+  + '.ia-msg{max-width:100%}.ia-barra-lbl{width:78px}.ia-barra-val{width:92px}'
+  + '.ia-tabela th:nth-child(4),.ia-tabela td:nth-child(4){display:none}}';
   document.head.appendChild(css);
 
   var fab = document.createElement('button');
@@ -6013,31 +6451,43 @@ function _iaMontarUI(){
       + grupo('Resultado', [
           ['Resumo do mês','resumo do mes'],
           ['Vendas do trimestre','quanto vendi no trimestre'],
-          ['Comparar os meses','comparar os meses do trimestre'],
+          ['Últimos 6 meses','compare minhas vendas dos ultimos 6 meses'],
+          ['Acumulado no ano','meu acumulado no ano'],
           ['Quanto falta pra meta','quanto falta para a meta']])
       + grupo('Dinheiro', [
+          ['Minha comissão','quanto ganhei de comissao'],
+          ['Comissão por canal','comissao por canal no trimestre'],
           ['O que está em aberto','o que esta em aberto'],
           ['Quanto já foi pago','quanto ja foi pago'],
-          ['Minha comissão','qual minha comissao'],
           ['Ticket médio','ticket medio do trimestre']])
+      + grupo('Funil', [
+          ['Quantos leads recebi','quantos leads recebi'],
+          ['Reuniões e no-shows','quantas reunioes iniciais fiz'],
+          ['Propostas','quantas propostas apresentei'],
+          ['Minhas conversões','quais minhas taxas de conversao'],
+          ['Tempo médio do ciclo','tempo medio entre lead e venda']])
+      + grupo('Origem', [
+          ['Melhores canais','qual canal mais vendeu no trimestre'],
+          ['Serviços mais vendidos','qual servico eu mais vendi'],
+          ['Desempenho dos SDRs','qual sdr gera mais reunioes']])
       + grupo('Campanhas', [
           ['Recorrências','quantas recorrencias no trimestre'],
           ['Power BI','quantos power bi no trimestre']])
-      + grupo('Funil', [
-          ['Reuniões e no-shows','quantas reunioes realizei'],
-          ['Minha conversão','qual minha conversao'],
-          ['Melhores canais','qual canal mais vendeu no trimestre']])
+      + grupo('Equipe', [
+          ['Quem vendeu mais','quem vendeu mais na equipe'],
+          ['Ranking do trimestre','ranking da equipe no trimestre']])
     + '</div>'
     + '<div id="ia-main">'
-      + '<div id="ia-head"><div><div class="ia-t">Assistente de dados</div>'
-      + '<div class="ia-s">Pergunte em português, eu busco no sistema</div></div>'
+      + '<div id="ia-head"><div><div class="ia-t">Assistente de inteligência comercial</div>'
+      + '<div class="ia-s">Pergunte em português. Combine período, canal, serviço, SDR e closer.</div></div>'
       + '<button onclick="iaToggle()" style="cursor:pointer;background:transparent;border:.5px solid rgba(255,255,255,.15);'
       + 'color:rgba(255,255,255,.6);border-radius:10px;padding:8px 16px;font-size:13px;font-family:Inter,sans-serif">Fechar</button></div>'
       + '<div id="ia-msgs"><div id="ia-empty"><div class="ia-big">📊</div>'
-      + 'Pergunte do seu jeito. Por exemplo:<br><b style="color:rgba(255,255,255,.65)">"quanto vendi em outubro"</b>, '
-      + '<b style="color:rgba(255,255,255,.65)">"o que está em aberto"</b> ou '
-      + '<b style="color:rgba(255,255,255,.65)">"quantas recorrências faltam"</b>.<br>'
-      + 'Use os atalhos ao lado se preferir.</div></div>'
+      + 'Exemplos que funcionam:<br>'
+      + '<b style="color:rgba(255,255,255,.65)">"quantas reuniões iniciais fiz em setembro"</b><br>'
+      + '<b style="color:rgba(255,255,255,.65)">"quanto ganhei de comissão por canal no trimestre"</b><br>'
+      + '<b style="color:rgba(255,255,255,.65)">"me mostra tudo que veio de evento nos últimos 6 meses"</b><br>'
+      + '<b style="color:rgba(255,255,255,.65)">"quem vendeu mais na equipe"</b></div></div>'
       + '<div id="ia-foot"><input id="ia-input" placeholder="Digite sua pergunta..." autocomplete="off">'
       + '<button onclick="iaEnviar()">Enviar</button></div>'
     + '</div>'
