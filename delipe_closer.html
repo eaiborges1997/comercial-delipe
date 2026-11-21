@@ -2152,7 +2152,7 @@ function recalc(){
   var trlV = document.getElementById('total-real');
   var trlS = document.getElementById('total-real-sub');
   if(tpjV) tpjV.textContent = fmt(totalProjFinal);
-  if(tpjS) tpjS.textContent = 'Comissao '+fmt(resProj.total)+' + Campanhas '+fmt(bonusProjTotal)+' + Bonus '+fmt(totB);
+  if(tpjS) tpjS.textContent = '';
   if(trlV) trlV.textContent = fmt(totalRealFinal);
   if(trlS) trlS.textContent = gatilhoAtingido
     ? ''
